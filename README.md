@@ -1,4 +1,4 @@
-# ReXgen Stream
+# ReXgen Stream for linux
 
 Influx Technology LTD - ReXgen Stream 
 
