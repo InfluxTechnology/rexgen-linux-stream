@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0
+
 #include "pipes.h"
 #include <sys/stat.h>
 #include <fcntl.h>
