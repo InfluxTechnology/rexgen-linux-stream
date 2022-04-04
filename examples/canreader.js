@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-2.0
+
 var fs = require('fs');
 var readline = require('readline');
 const debug = console.log; // Set to false to remove debug
