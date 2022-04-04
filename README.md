@@ -1,4 +1,6 @@
-# rexgen-stream
+# ReXgen Stream
+
+Influx Technology LTD - ReXgen Stream 
 
 ReXgen Stream is a software for utilizing ReXgen device in order to make it easy transfering and receiving can data. Also receiving accelerometer and gyroscope data.
 This application is using linux pipes technology to automate the process. <br/>
