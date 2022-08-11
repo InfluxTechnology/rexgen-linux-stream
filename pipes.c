@@ -7,34 +7,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include "rexgen-stream.h"
 #include "../rexusb/commands.h"
-
-char* add_msg_chn(char msg[], unsigned short uid)
-{
-    char *s[20];
-    strcpy(s, "");
-
-    if (uid == accXuid)
-        strcat(s, " accX ");
-    else if (uid == accYuid)
-        strcat(s," accY ");
-    else if (uid == accZuid)
-        strcat(s," accZ ");
-    else if (uid == gyroXuid)
-        strcat(s," gyroX");
-    else if (uid == gyroYuid)
-        strcat(s," gyroY");
-    else if (uid == gyroZuid)
-        strcat(s," gyroZ");
-    else if (uid == can0uid)
-        strcat(s," can0 ");
-    else if (uid == can1uid)
-        strcat(s," can1 ");
-    
-    strcat(s, " ");
-    strcat(msg, s);
-    return msg;
-}
 
 char* add_msg_val(char msg[], unsigned int val, char type)
 {
@@ -70,8 +44,8 @@ void CanRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsigned
    	char *path[50];
 	sprintf(path, "%s/%s/rx", dir_rexgen, name);
 
-    //printf("open pipe: %s\n", path);
-	int pipe = open(path, O_WRONLY);
+    printf("open pipe: %s\n", path);
+	int pipe = open(path, O_WRONLY | O_SYNC);
 
 	if (pipe == -1)
 	{
@@ -79,42 +53,65 @@ void CanRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsigned
 		return NULL;
 	}
 
-   	char *msg[50];
+   	char *msg[250];
 
    	unsigned long d_size;
    	unsigned char d_data[pipe_buffer_size];
+
+   	void Records2Pipe(unsigned char* data, unsigned long size)
+   	{
+    	unsigned long d_pos = 0;
+	    while (d_pos < size)
+	    {
+			unsigned short uid = ((unsigned short*)(data + d_pos))[0];
+    	    unsigned char infSize = data[d_pos + 2];
+			unsigned char dlc = data[d_pos + 3];
+    	    unsigned int timestamp = ((unsigned int*)(data + d_pos + 4))[0];
+			unsigned int canID = ((unsigned int*)(data + d_pos + 8))[0];
+			unsigned char flags = data[d_pos + 12];
+
+			strcpy(msg, "");
+			char* ptr = msg;
+			ptr+= sprintf(ptr, "(%u)  %s  ", timestamp, name);
+			switch (flags & 0x0C)
+			{
+				case 0x00: 
+					ptr+= sprintf(ptr, "    ");
+					break;
+				case 0x04:
+					ptr+= sprintf(ptr, "[F] ");
+					break;
+				case 0x0C:
+					ptr+= sprintf(ptr, "[FB]");
+					break;
+			}
+			ptr+= sprintf(ptr, "  ");
+			if (flags & 0x01)
+				ptr+= sprintf(ptr, "%08X ", canID);
+			else
+				ptr+= sprintf(ptr, "     %03X ", canID);
+    	    ptr+= sprintf(ptr, "[%i]", dlc);
+
+			for (int i = 0; i < dlc; i++)
+				ptr+= sprintf(ptr, " %02X", d_data[d_pos + i + 4 + infSize]);
+
+			ptr+= sprintf(ptr, "\n\0");
+			write(pipe, msg, strlen(msg));
+
+			d_pos+= 4 + infSize + dlc;
+    	}
+   	}
 
     while (true)
     {
 	    pthread_mutex_lock(mutex);
 	    d_size = *datasize;
+	    *datasize = 0;
 	    if (d_size > 0)
 	    	memcpy(&(d_data[0]), &(*data), d_size);
-	    *datasize = 0;
     	pthread_mutex_unlock(mutex);
-
-	    if (d_size > 0)
-	    {
-			unsigned short uid = ((unsigned short*)(d_data + 0))[0];
-    	    unsigned char infSize = d_data[2];
-			unsigned char dlc = d_data[3];
-    	    unsigned int timestamp = ((unsigned int*)(d_data + 4))[0];
-    	    strcpy(msg, "");
-    	    add_msg_val(msg, timestamp, 0);
-    	    add_msg_chn(msg, uid);
-			unsigned int canID = ((unsigned int*)(d_data + 8))[0];
-			add_msg_val(msg, canID, 1);
-    	    add_msg_val(msg, dlc, 3);
-			unsigned char flags = d_data[12];	
-			for (int i = 0; i < dlc; i++)
-				add_msg_val(msg, d_data[i + 13], 2);
-
-			strcat(msg, "\n");
-			//printf("%s\n", msg);
-			write(pipe, msg, strlen(msg));
-    	}
-    	//else
-	 	   	//printf(s, "can%d: empty\n", channel);
+	    usleep(1);
+	    Records2Pipe(&(d_data[0]), d_size);
     }
 
     close(pipe);
@@ -122,6 +119,7 @@ void CanRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsigned
 
 void* execute_can0rx(void* ptr)
 {
+	//CanRx(can0, &mutex_rx_pipe, &datasize_can0rx, &data_can0rx);
 	CanRx(can0, &mutex_can0_rx, &datasize_can0rx, &data_can0rx);
 
     return NULL;
@@ -129,6 +127,7 @@ void* execute_can0rx(void* ptr)
 
 void* execute_can1rx(void* ptr)
 {
+	//CanRx(can1, &mutex_rx_pipe, &datasize_can1rx, &data_can1rx);
 	CanRx(can1, &mutex_can1_rx, &datasize_can1rx, &data_can1rx);
 
     return NULL;
@@ -170,7 +169,6 @@ bool HexToLong(const char* str, unsigned long* val)
 
 void CanTx(char* name, unsigned short txuid, pthread_mutex_t* mutex, unsigned long* datasize, unsigned char* data)
 {
-
     char *buffer = (char*)malloc(512);
     unsigned short buffidx = 2;
 
@@ -197,17 +195,30 @@ void CanTx(char* name, unsigned short txuid, pthread_mutex_t* mutex, unsigned lo
 	void Row2Bin(TxCanRow row, int count)
 	{
 		unsigned long tmp;
+		unsigned char flags = 0;
+		unsigned char containflags = 0;
 
 		buffidx = 0;
 
-		if (!StrToLong(row[3], &tmp))
+		if (row[2][0] == '[')
+		{
+			if (row[2][1] == 'F')
+			{
+				flags|= 4;
+				if (row[2][2] == 'B')
+					flags|= 8;
+			}
+			containflags = 1;
+		}
+
+		if (!StrToLong(row[3 + containflags], &tmp))
 			return;
 
 		unsigned char dlc = tmp;
 		//if (buffidx + 4 + 9 + dlc > 512)
 			//BufferToApp();
 
-		if (dlc < 0 || dlc > 64 || 4 + dlc != count)
+		if (dlc < 0 || dlc > 64 || 4 + dlc + containflags != count)
 			return;
 
 		if (!StrToLong(row[1], &tmp))
@@ -226,16 +237,18 @@ void CanTx(char* name, unsigned short txuid, pthread_mutex_t* mutex, unsigned lo
 		memcpy(&(buffer[buffidx + 0]), &ts, 4);
 
 		unsigned long ident;
-		if (!HexToLong(row[2], &ident))
+		if (!HexToLong(row[2 + containflags], &ident))
 			return;
 		memcpy(&(buffer[buffidx + 4]), &ident, 4);
 		
-		buffer[buffidx + 8] = 0;
+		if (strlen(row[2 + containflags]) > 3)
+			flags|= 1;
+		buffer[buffidx + 8] = flags;
 		
 		buffidx+= 9;
 		for (int i = 0; i < dlc; i++)
 		{
-			if (!HexToLong(row[4 + i], &tmp))
+			if (!HexToLong(row[4 + i + containflags], &tmp))
 				return;
 			buffer[buffidx + i] = tmp;
 		}
@@ -278,7 +291,10 @@ void CanTx(char* name, unsigned short txuid, pthread_mutex_t* mutex, unsigned lo
     		while (row[rc] != NULL)
     		{
 	      		rc++;
-      			row[rc] = strtok(NULL, " ()[]\n");
+	      		if (rc == 2)
+      				row[rc] = strtok(NULL, " \n");
+      			else
+      				row[rc] = strtok(NULL, " ()[]\n");
    			}
    			// At least 4 words are needed - Timestamp, Can channel, Ident, Dlc
 	   		if (rc < 4)
@@ -321,7 +337,7 @@ void* execute_can1tx(void* ptr)
     return NULL;
 }
 
-char* SensorUidToType(unsigned short uid)
+char* UidToStringName(unsigned short uid)
 {
 	if (uid == gyroXuid || uid == accXuid)
 		return "X";
@@ -329,14 +345,34 @@ char* SensorUidToType(unsigned short uid)
 		return "Y";
 	if (uid == gyroZuid || uid == accZuid)
 		return "Z";
+	if (uid == dig0uid || uid == adc0uid)
+		return "0";
+	if (uid == dig1uid || uid == adc1uid)
+		return "1";
 	return "NA";
 }
 
-void SensorRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsigned char* data)
+void ByteWriter(char* targetstr, unsigned short uid, unsigned int timestamp, char* data)
+{
+	sprintf(targetstr, "(%u) %s %u\n", timestamp, 
+		UidToStringName(uid), ((unsigned char*)(data))[0]
+	);
+}
+
+void FloatWriter(char* targetstr, unsigned short uid, unsigned int timestamp, char* data)
+{
+	sprintf(targetstr, "(%u) %s %f\n", timestamp, 
+		UidToStringName(uid), ((float*)(data))[0]
+	);
+}
+
+void SensorRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsigned char* data, 
+	void (*data_writer)(char* targetstr, unsigned short uid, unsigned int timestamp, char* data))
 {
    	char *path[50];
 	sprintf(path, "%s/%s/rx", dir_rexgen, name);
 
+    printf("open pipe: %s\n", path);
 	int pipe = open(path, O_WRONLY);
 
 	if (pipe == -1)
@@ -350,6 +386,25 @@ void SensorRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsig
    	unsigned long d_size;
    	unsigned char d_data[pipe_buffer_size];
 
+   	void Records2Pipe()
+   	{
+    	unsigned long d_pos = 0;
+	    while (d_pos < d_size)
+	    {
+
+			unsigned short uid = ((unsigned short*)(d_data + d_pos))[0];
+    	    unsigned char infSize = d_data[d_pos + 2];
+			unsigned char dlc = d_data[d_pos + 3];
+    	    unsigned int timestamp = ((unsigned int*)(d_data + d_pos + 4))[0];
+
+    	    data_writer(msg, uid, timestamp, d_data + d_pos + 4 + infSize);
+
+			write(pipe, msg, strlen(msg));
+
+			d_pos+= 4 + infSize + dlc;
+    	}
+   	}
+
     while (true)
     {
 	    pthread_mutex_lock(mutex);
@@ -359,18 +414,8 @@ void SensorRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsig
 	    *datasize = 0;
     	pthread_mutex_unlock(mutex);
 
-	    if (d_size > 0)
-	    {
-			unsigned short uid = ((unsigned short*)(d_data + 0))[0];
-    	    unsigned char infSize = d_data[2];
-			unsigned char dlc = d_data[3];
-    	    unsigned int timestamp = ((unsigned int*)(d_data + 4))[0];
-		   	float value = ((float*)(d_data + 4 + infSize))[0];
-
-    	    sprintf(msg, "(%u) %s %f\n", timestamp, SensorUidToType(uid), value);
-
-			write(pipe, msg, strlen(msg));
-    	}
+    	usleep(1);
+	    Records2Pipe();
     }
 
     close(pipe);
@@ -378,65 +423,146 @@ void SensorRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsig
 
 void* execute_gyrorx(void* ptr)
 {
-	SensorRx(gyro, &mutex_gyro_rx, &datasize_gyrorx, &data_gyrorx);
+	SensorRx(gyro, &mutex_gyro_rx, &datasize_gyrorx, &data_gyrorx, &FloatWriter);
     return NULL;
 }
 
 void* execute_accrx(void* ptr)
 {
-	SensorRx(acc, &mutex_acc_rx, &datasize_accrx, &data_accrx);
+	SensorRx(acc, &mutex_acc_rx, &datasize_accrx, &data_accrx, &FloatWriter);
     return NULL;
 }
 
-/*void SensorTx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsigned char* data)
+void* execute_digrx(void* ptr)
 {
-
-}
-
-void* execute_gyrotx(void* ptr)
-{
-	SensorTx(gyro, &mutex_gyro_tx, &datasize_gyrotx, &data_gyrotx);
+	SensorRx(dig, &mutex_dig_rx, &datasize_digrx, &data_digrx, &ByteWriter);
     return NULL;
 }
 
-void* execute_acctx(void* ptr)
+void* execute_adcrx(void* ptr)
 {
-	SensorTx(acc, &mutex_acc_tx, &datasize_acctx, &data_acctx);
+	SensorRx(adc, &mutex_adc_rx, &datasize_adcrx, &data_adcrx, &FloatWriter);
     return NULL;
-}*/
+}
+
+void* execute_io(void* ptr)
+{
+   	char *path[50];
+	sprintf(path, "%s/%s", dir_rexgen, sys);
+
+    printf("open pipe: %s\n", path);
+	int pipe = open(path, O_WRONLY);
+
+	if (pipe == -1)
+	{
+		printf("pipe id: %s failed to open\n", path);
+		return NULL;
+	}
+
+   	char *msg[150];
+
+	EndpointCommunicationStruct* ep = &devobj.ep[epData];
+
+	uint cycle = 0;
+	while (true)
+	{
+		if (cycle % nfc_io_cycles == 0)
+		{
+			SendCommand(&devobj, epData, &cmmdGetNFC);
+			//PrintRxCmmd(ep);
+			char* ptr = &msg[0];
+
+			time_t raw_time = ((unsigned int*)(ep->rx_data + 13))[0];
+			//time(&raw_time);
+			struct tm ts = *localtime(&raw_time);
+			ptr+= strftime(ptr, 150, "%a %Y-%m-%d %H:%M:%S", &ts);
+			ptr+= sprintf(ptr, ", NFC: ");
+			for (int i = 0; i < 7; i++)
+			{
+				ptr += sprintf(ptr, "%02X", *((unsigned char*)(ep->rx_data + 5 + i)));
+			}
+			if (ep->rx_data[12] == 1 || ep->rx_data[12] == 2)
+				ptr+= sprintf(ptr, ", Status: Valid\r\n");
+			else if (ep->rx_data[12] == 0xFF)
+				ptr+= sprintf(ptr, ", Status: Invalid\r\n");
+			/*else if (ep->rx_data[12] == 0)
+				ptr+= sprintf(ptr, ", Status: No card\r\n");
+			else
+				ptr+= sprintf(ptr, ", Status: Error\r\n");*/
+			else 
+				continue;
+			write(pipe, msg, strlen(msg));
+		}
+
+		usleep(io_interval);
+		cycle++;
+	};
+    close(pipe);
+}
+
+void* execute_usb(void* ptr)
+{
+	while (true)
+	{
+		parse_live_data();
+		//read_live_data();
+	};
+}
 
 void InitFifo(char* name, bool tx, bool rx)
 {
 	struct stat st = {0};
    	char *path[50];
 
-	sprintf(path, "%s/%s/", dir_rexgen, name);
-	if (stat(path, &st) == -1)
-		mkdir(path, 0666);
-	if (tx)
+	if (!tx && !rx)
 	{
-		sprintf(path, "%s/%s/tx", dir_rexgen, name);
+		sprintf(path, "%s/%s", dir_rexgen, name);
     	if (stat(path, &st) == -1)
-	    	mkfifo(path, 0666);
+	    	mkfifo(path, 0755);
 	}
-	if (rx)
+	else
 	{
-		sprintf(path, "%s/%s/rx", dir_rexgen, name);
-    	if (stat(path, &st) == -1)
-	    	mkfifo(path, 0666);
+		sprintf(path, "%s/%s/", dir_rexgen, name);
+		if (stat(path, &st) == -1)
+			mkdir(path, 0755);
+
+		if (tx)
+		{
+			sprintf(path, "%s/%s/tx", dir_rexgen, name);
+    		if (stat(path, &st) == -1)
+		    	mkfifo(path, 0777);
+		}
+		if (rx)
+		{
+			sprintf(path, "%s/%s/rx", dir_rexgen, name);
+    		if (stat(path, &st) == -1)
+		    	mkfifo(path, 0755);
+		}
 	}
 }
 
 bool InitPipes()
 {
+	umask(0);
 	struct stat st = {0};
-	if (!stat(dir_rexgen, &st))
-		mkdir(dir_rexgen, 0777);
+	if (stat(dir_rexgen, &st) == -1)
+		mkdir(dir_rexgen, 0755);
 
+	InitFifo(sys, false, false);
 	InitFifo(can0, true, true);
 	InitFifo(can1, true, true);
 	InitFifo(gyro, false, true);
 	InitFifo(acc, false, true);
+	InitFifo(dig, false, true);
+	InitFifo(adc, false, true);
+
+	// Usb IO
+	pthread_create(&io, NULL, &execute_io, NULL);
+
+	// Usb receiver
+	queue.qidx1 = 0;
+	queue.qidx2 = 0;
+	pthread_create(&usb, NULL, &execute_usb, NULL);
 
 	// Can0
 	datasize_can0tx = 0;
@@ -462,11 +588,31 @@ bool InitPipes()
 	datasize_accrx = 0;
 	pthread_create(&accrx, NULL, &execute_accrx, NULL);
 
+	// Digital
+	//datasize_digtx = 0;
+	//pthread_create(&digtx, NULL, &execute_digtx, NULL);
+	datasize_digrx = 0;
+	pthread_create(&digrx, NULL, &execute_digrx, NULL);
+
+	// ADC
+	//datasize_adctx = 0;
+	//pthread_create(&adctx, NULL, &execute_adctx, NULL);
+	datasize_adcrx = 0;
+	pthread_create(&adcrx, NULL, &execute_adcrx, NULL);
+
 	return true;
 }
 
 void DestroyPipes()
 {
+	// IO
+	pthread_exit(&io);
+	//pthread_mutex_destroy(&mutex_io);
+
+	// Usb
+	pthread_exit(&usb);
+	pthread_mutex_destroy(&mutex_usb);
+
 	// Can0
 	pthread_exit(&can0tx);
 	pthread_mutex_destroy(&mutex_can0_tx);
