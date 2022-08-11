@@ -148,12 +148,12 @@ async function run()
 		outputstream = fs.createWriteStream(arg[2]);
 	}
 
-	//new Promise((resolve) => { startCanReader(can0pipePath, 0); });
+	new Promise((resolve) => { startCanReader(can0pipePath, 0); });
 	new Promise((resolve) => { startCanReader(can1pipePath, 1); });
-	//new Promise((resolve) => { startSensorReader(accpipePath, "Accelerometer"); });
-	//new Promise((resolve) => { startSensorReader(gyropipePath, "Gyroscope"); });
-	//new Promise((resolve) => { startSensorReader(digitalpipePath, "Digital"); });
-	//new Promise((resolve) => { startSensorReader(adcpipePath, "ADC"); });
+	new Promise((resolve) => { startSensorReader(accpipePath, "Accelerometer"); });
+	new Promise((resolve) => { startSensorReader(gyropipePath, "Gyroscope"); });
+	new Promise((resolve) => { startSensorReader(digitalpipePath, "Digital"); });
+	new Promise((resolve) => { startSensorReader(adcpipePath, "ADC"); });
 }
 
 run();
