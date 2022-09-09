@@ -349,6 +349,37 @@ char* UidToStringName(unsigned short uid)
 		return "0";
 	if (uid == dig1uid || uid == adc1uid)
 		return "1";
+	if (uid == adc2uid)
+		return "2";
+	if (uid == adc3uid)
+		return "3";
+	if (uid == gnss0uid)
+		return "Latitude";
+	if (uid == gnss1uid)
+		return "Longitude";
+	if (uid == gnss2uid)
+		return "Altitude";
+	if (uid == gnss3uid)
+		return "Datetime";
+	if (uid == gnss4uid)
+		return "SpeedOverGround";
+	if (uid == gnss5uid)
+		return "GroundDistance";
+	if (uid == gnss6uid)
+		return "CourseOverGround";
+	if (uid == gnss7uid)
+		return "GeoidSeparation";
+	if (uid == gnss8uid)
+		return "NumberSatellites";
+	if (uid == gnss9uid)
+		return "Quality";
+	if (uid == gnss10uid)
+		return "HorizontalAccuracy";
+	if (uid == gnss11uid)
+		return "VerticalAccuracy";
+	if (uid == gnss12uid)
+		return "SpeedAccuracy";
+
 	return "NA";
 }
 
@@ -364,6 +395,18 @@ void FloatWriter(char* targetstr, unsigned short uid, unsigned int timestamp, ch
 	sprintf(targetstr, "(%u) %s %f\n", timestamp, 
 		UidToStringName(uid), ((float*)(data))[0]
 	);
+}
+
+void DoubleOrFloatWriter(char* targetstr, unsigned short uid, unsigned int timestamp, char* data)
+{
+	if (uid == gnss0uid || uid == gnss1uid)
+		sprintf(targetstr, "(%u) %s %f\n", timestamp, 
+			UidToStringName(uid), ((double*)(data))[0]
+		);
+	else
+		sprintf(targetstr, "(%u) %s %f\n", timestamp, 
+			UidToStringName(uid), ((float*)(data))[0]
+		);
 }
 
 void SensorRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsigned char* data, 
@@ -419,6 +462,12 @@ void SensorRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsig
     }
 
     close(pipe);
+}
+
+void* execute_gnssrx(void* ptr)
+{
+	SensorRx(gnss, &mutex_gnss_rx, &datasize_gnssrx, &data_gnssrx, &DoubleOrFloatWriter);
+    return NULL;
 }
 
 void* execute_gyrorx(void* ptr)
@@ -504,7 +553,7 @@ void* execute_usb(void* ptr)
 {
 	while (true)
 	{
-		parse_live_data();
+		parse_live_data(*(unsigned short *)ptr);
 		//read_live_data();
 	};
 }
@@ -541,69 +590,86 @@ void InitFifo(char* name, bool tx, bool rx)
 	}
 }
 
-bool InitPipes()
+bool InitPipes(unsigned short pipe_flags)
 {
 	umask(0);
 	struct stat st = {0};
 	if (stat(dir_rexgen, &st) == -1)
 		mkdir(dir_rexgen, 0755);
 
-	InitFifo(sys, false, false);
-	InitFifo(can0, true, true);
-	InitFifo(can1, true, true);
-	InitFifo(gyro, false, true);
-	InitFifo(acc, false, true);
-	InitFifo(dig, false, true);
-	InitFifo(adc, false, true);
-
 	// Usb IO
+	InitFifo(sys, false, false);
 	pthread_create(&io, NULL, &execute_io, NULL);
+
+	// Can0
+	if (flag_can0 & pipe_flags)
+	{
+		InitFifo(can0, true, true);
+		datasize_can0tx = 0;
+		pthread_create(&can0tx, NULL, &execute_can0tx, NULL);
+		datasize_can0rx = 0;
+		pthread_create(&can0rx, NULL, &execute_can0rx, NULL);
+	}
+
+	// Can1
+	if (flag_can1 & pipe_flags)
+	{
+		InitFifo(can1, true, true);
+		datasize_can1tx = 0;
+		pthread_create(&can1tx, NULL, &execute_can1tx, NULL);
+		datasize_can1rx = 0;
+		pthread_create(&can1rx, NULL, &execute_can1rx, NULL);
+	}
+
+	// Gnss
+	if (flag_gnss & pipe_flags)
+	{
+		InitFifo(gnss, false, true);
+		datasize_gnssrx = 0;
+		pthread_create(&gnssrx, NULL, &execute_gnssrx, NULL);
+	}
+
+	// Gyro
+	if (flag_gyro & pipe_flags)
+	{
+		InitFifo(gyro, false, true);
+		datasize_gyrorx = 0;
+		pthread_create(&gyrorx, NULL, &execute_gyrorx, NULL);
+	}
+
+	// Acc
+	if (flag_acc & pipe_flags)
+	{
+		InitFifo(acc, false, true);
+		datasize_accrx = 0;
+		pthread_create(&accrx, NULL, &execute_accrx, NULL);
+	}
+
+	// Digital
+	if (flag_dig & pipe_flags)
+	{
+		InitFifo(dig, false, true);
+		datasize_digrx = 0;
+		pthread_create(&digrx, NULL, &execute_digrx, NULL);
+	}
+
+	// ADC
+	if (flag_adc & pipe_flags)
+	{
+		InitFifo(adc, false, true);
+		datasize_adcrx = 0;
+		pthread_create(&adcrx, NULL, &execute_adcrx, NULL);
+	}
 
 	// Usb receiver
 	queue.qidx1 = 0;
 	queue.qidx2 = 0;
-	pthread_create(&usb, NULL, &execute_usb, NULL);
-
-	// Can0
-	datasize_can0tx = 0;
-	pthread_create(&can0tx, NULL, &execute_can0tx, NULL);
-	datasize_can0rx = 0;
-	pthread_create(&can0rx, NULL, &execute_can0rx, NULL);
-
-	// Can1
-	datasize_can1tx = 0;
-	pthread_create(&can1tx, NULL, &execute_can1tx, NULL);
-	datasize_can1rx = 0;
-	pthread_create(&can1rx, NULL, &execute_can1rx, NULL);
-
-	// Gyro
-	//datasize_gyrotx = 0;
-	//pthread_create(&gyrotx, NULL, &execute_gyrotx, NULL);
-	datasize_gyrorx = 0;
-	pthread_create(&gyrorx, NULL, &execute_gyrorx, NULL);
-
-	// Acc
-	//datasize_acctx = 0;
-	//pthread_create(&acctx, NULL, &execute_acctx, NULL);
-	datasize_accrx = 0;
-	pthread_create(&accrx, NULL, &execute_accrx, NULL);
-
-	// Digital
-	//datasize_digtx = 0;
-	//pthread_create(&digtx, NULL, &execute_digtx, NULL);
-	datasize_digrx = 0;
-	pthread_create(&digrx, NULL, &execute_digrx, NULL);
-
-	// ADC
-	//datasize_adctx = 0;
-	//pthread_create(&adctx, NULL, &execute_adctx, NULL);
-	datasize_adcrx = 0;
-	pthread_create(&adcrx, NULL, &execute_adcrx, NULL);
+	pthread_create(&usb, NULL, &execute_usb, &pipe_flags);
 
 	return true;
 }
 
-void DestroyPipes()
+void DestroyPipes(unsigned short pipe_flags)
 {
 	// IO
 	pthread_exit(&io);
@@ -614,27 +680,56 @@ void DestroyPipes()
 	pthread_mutex_destroy(&mutex_usb);
 
 	// Can0
-	pthread_exit(&can0tx);
-	pthread_mutex_destroy(&mutex_can0_tx);
-	pthread_exit(&can0rx);
-	pthread_mutex_destroy(&mutex_can0_rx);
+	if (flag_can0 & pipe_flags)
+	{
+		pthread_exit(&can0tx);
+		pthread_mutex_destroy(&mutex_can0_tx);
+		pthread_exit(&can0rx);
+		pthread_mutex_destroy(&mutex_can0_rx);
+	}
 
 	// Can1
-	pthread_exit(&can1tx);
-	pthread_mutex_destroy(&mutex_can1_tx);
-	pthread_exit(&can1rx);
-	pthread_mutex_destroy(&mutex_can1_rx);
+	if (flag_can1 & pipe_flags)
+	{
+		pthread_exit(&can1tx);
+		pthread_mutex_destroy(&mutex_can1_tx);
+		pthread_exit(&can1rx);
+		pthread_mutex_destroy(&mutex_can1_rx);
+	}
 	
+	// Gnss
+	if (flag_gnss & pipe_flags)
+	{
+		pthread_exit(&gnssrx);
+		pthread_mutex_destroy(&mutex_gnss_rx);
+	}
+
 	// Gyro
-	//pthread_exit(&gyrotx);
-	//pthread_mutex_destroy(&mutex_gyro_tx);
-	pthread_exit(&gyrorx);
-	pthread_mutex_destroy(&mutex_gyro_rx);
+	if (flag_gyro & pipe_flags)
+	{
+		pthread_exit(&gyrorx);
+		pthread_mutex_destroy(&mutex_gyro_rx);
+	}
 
 	// Acc
-	//pthread_exit(&acctx);
-	//pthread_mutex_destroy(&mutex_acc_tx);
-	pthread_exit(&accrx);
-	pthread_mutex_destroy(&mutex_acc_rx);
+	if (flag_acc & pipe_flags)
+	{
+		pthread_exit(&accrx);
+		pthread_mutex_destroy(&mutex_acc_rx);
+	}
+
+	// Digital
+	if (flag_dig & pipe_flags)
+	{
+		pthread_exit(&digrx);
+		pthread_mutex_destroy(&mutex_dig_rx);
+	}
+
+	// ADC
+	if (flag_adc & pipe_flags)
+	{
+		pthread_exit(&adcrx);
+		pthread_mutex_destroy(&mutex_adc_rx);
+	}
 }
 

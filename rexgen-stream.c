@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // v1.5 - added sys pipe with support of NFC
 // v1.6 - added canfd support, adc and digital support
+// v1.7 - added gnss support, added 2 more adc
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,8 +68,37 @@ void printkBuffer(void *data, int len, char* prefix)
         printf("%s: %s - %s", "ReX", prefix, buff);
 }
 
-void parse_live_data()
+void parse_live_data(unsigned short flags)
 {
+	bool isAccelerometer(unsigned short uid)
+	{
+		return (uid == accXuid || uid == accYuid || uid == accZuid);
+	}
+
+	bool isGyroscope(unsigned short uid)
+	{
+		return (uid == gyroXuid || uid == gyroYuid || uid == gyroZuid);
+	}
+
+	bool isDigital(unsigned short uid)
+	{
+		return (uid == dig0uid || uid == dig1uid);
+	}
+
+	bool isADC(unsigned short uid)
+	{
+		return (uid == adc0uid || uid == adc1uid || uid == adc2uid || uid == adc3uid);
+	}
+
+	bool isGnss(unsigned short uid)
+	{
+		return (
+			uid == gnss0uid || uid == gnss1uid || uid == gnss2uid || uid == gnss3uid || uid == gnss4uid ||
+			uid == gnss5uid || uid == gnss6uid || uid == gnss7uid || uid == gnss8uid || uid == gnss9uid ||
+			uid == gnss10uid || uid == gnss11uid || uid == gnss12uid
+			);
+	}
+
 	unsigned char q[max_queue_buffers][pipe_buffer_size];
 	unsigned char qcount = 0;
 
@@ -115,7 +145,11 @@ void parse_live_data()
 			unsigned int timestamp = ((unsigned int*)(data + pos + 4))[0];
 			unsigned long recsize = 4 + infSize + dlc;
 
-			if (uid == can0uid)
+			if (uid == 0)
+			{
+
+			}
+			else if (flags & flag_can0 && uid == can0uid)
 			{
 				pthread_mutex_lock(&mutex_can0_rx);
 				if (datasize_can0rx + recsize > pipe_buffer_size)
@@ -124,7 +158,7 @@ void parse_live_data()
 				datasize_can0rx+= recsize;
 				pthread_mutex_unlock(&mutex_can0_rx);
 			}
-			else if (uid == can1uid)
+			else if (flags & flag_can1 && uid == can1uid)
 			{
 				pthread_mutex_lock(&mutex_can1_rx);
 				if (datasize_can1rx + recsize > pipe_buffer_size)
@@ -133,7 +167,7 @@ void parse_live_data()
 				datasize_can1rx+= recsize;
 				pthread_mutex_unlock(&mutex_can1_rx);
 			}
-   			else if (uid == accXuid || uid == accYuid || uid == accZuid)
+   			else if (flags & flag_acc && isAccelerometer(uid))
    			{
 				pthread_mutex_lock(&mutex_acc_rx);
 				if (datasize_accrx + recsize > pipe_buffer_size)
@@ -142,7 +176,7 @@ void parse_live_data()
 				datasize_accrx+= recsize;
 				pthread_mutex_unlock(&mutex_acc_rx);
    			}
- 			else if (uid == gyroXuid || uid == gyroYuid || uid == gyroZuid)
+ 			else if (flags & flag_gyro && isGyroscope(uid))
  			{
 				pthread_mutex_lock(&mutex_gyro_rx);
 				if (datasize_gyrorx + recsize > pipe_buffer_size)
@@ -151,7 +185,7 @@ void parse_live_data()
 				datasize_gyrorx+= recsize;
 				pthread_mutex_unlock(&mutex_gyro_rx);
  			}
- 			else if (uid == dig0uid || uid == dig1uid)
+ 			else if (flags & flag_dig && isDigital(uid))
  			{
 				pthread_mutex_lock(&mutex_dig_rx);
 				if (datasize_digrx + recsize > pipe_buffer_size)
@@ -160,7 +194,7 @@ void parse_live_data()
 				datasize_digrx+= recsize;
 				pthread_mutex_unlock(&mutex_dig_rx);
  			}
- 			else if (uid == adc0uid || uid == adc1uid)
+ 			else if (flags & flag_adc && isADC(uid))
  			{
 				pthread_mutex_lock(&mutex_adc_rx);
 				if (datasize_adcrx + recsize > pipe_buffer_size)
@@ -168,6 +202,15 @@ void parse_live_data()
 				memcpy(&(data_adcrx[datasize_adcrx]), &(data[pos]), recsize);
 				datasize_adcrx+= recsize;
 				pthread_mutex_unlock(&mutex_adc_rx);
+ 			}
+ 			else if (flags & flag_gnss && isGnss(uid))
+ 			{
+				pthread_mutex_lock(&mutex_gnss_rx);
+				if (datasize_gnssrx + recsize > pipe_buffer_size)
+					datasize_gnssrx = 0;
+				memcpy(&(data_gnssrx[datasize_gnssrx]), &(data[pos]), recsize);
+				datasize_gnssrx+= recsize;
+				pthread_mutex_unlock(&mutex_gnss_rx);
  			}
 
     		pos += recsize;   //skip bytes from unknown frames
@@ -180,7 +223,7 @@ void get_send_live_data()
 {
 }
 
-void send_live_data()
+void send_live_data(unsigned short flags)
 {
 	EndpointCommunicationStruct *ep = &devobj.ep[epLive];
 
@@ -208,8 +251,10 @@ void send_live_data()
 
 	}
 
-	PipeToCan(0, &mutex_can0_tx, &datasize_can0tx, &data_can0tx);
-	PipeToCan(1, &mutex_can1_tx, &datasize_can1tx, &data_can1tx);
+	if (flags & flag_can0)
+		PipeToCan(0, &mutex_can0_tx, &datasize_can0tx, &data_can0tx);
+	if (flags & flag_can1)
+		PipeToCan(1, &mutex_can1_tx, &datasize_can1tx, &data_can1tx);
 }
 
 void read_live_data()
@@ -246,7 +291,7 @@ int main (int argc, char *argv[])
     
     if (check_arg("-v") == 1)
     {	
-        printf("1.6 \n");
+        printf("1.7 \n");
 		return;
     }
 
@@ -263,40 +308,55 @@ int main (int argc, char *argv[])
 
     HideRequest = true;
 
-    accXuid = 7;
-	accYuid = 8;
-	accZuid = 9;
-	gyroXuid = 19;
-	gyroYuid = 20;
-	gyroZuid = 21;
-	can0uid = 100;
-	can1uid = 200;
 	CANDebugMode = 0;
+	unsigned short pipe_flags = 0;
 
     GetConfig(&devobj);
+    if (can0uid != 0)
+    	pipe_flags |= flag_can0;
+    if (can1uid != 0)
+    	pipe_flags |= flag_can1;
+    if (accXuid !=0 || accYuid !=0 || accZuid != 0)
+    	pipe_flags |= flag_acc;
+    if (gyroXuid !=0 || gyroYuid !=0 || gyroZuid !=0)
+    	pipe_flags |= flag_gyro;
+    if (dig0uid !=0 || dig1uid !=0)
+    	pipe_flags |= flag_dig;
+    if (adc0uid !=0 || adc1uid !=0 || adc2uid !=0 || adc3uid !=0)
+    	pipe_flags |= flag_adc;
+    if (gnss0uid !=0 || gnss1uid !=0 || gnss2uid !=0 || gnss3uid !=0 || gnss4uid !=0 ||
+    	gnss5uid !=0 || gnss6uid !=0 ||	gnss7uid !=0 || gnss8uid !=0 || gnss9uid !=0 ||
+    	gnss10uid !=0 || gnss11uid !=0 || gnss12uid !=0)
+    	pipe_flags |= flag_gnss;
+
     printf(
     	"Detected UIDs:\n"
     	"CAN 0/1 - %i/%i\n"
     	"Accelerometer X/Y/Z - %i/%i/%i\n"
     	"Gyroscope X/Y/Z - %i/%i/%i\n"
     	"Digital 0/1 - %i/%i\n"
-    	"ADC 0/1 - %i/%i\r\n",
+    	"ADC 0/1/2/3 - %i/%i/%i/%i\r\n"
+    	"GNSS: Latitude - %i, Longitude - %i, Altitude - %i, Datetime - %i, SpeedOverGround - %i, "
+    	"GroundDistance - %i, CourseOverGround - %i, GeoidSeparation - %i, NumberSatellites - %i, "
+    	"Quality - %i, HorizontalAccuracy - %i, VerticalAccuracy - %i, SpeedAccuracy - %i\r\n",
     	can0uid, can1uid, 
     	accXuid, accYuid, accZuid, 
     	gyroXuid, gyroYuid, gyroZuid,
     	dig0uid, dig1uid,
-    	adc0uid, adc1uid
+    	adc0uid, adc1uid, adc2uid, adc3uid,
+		gnss0uid, gnss1uid, gnss2uid, gnss3uid, gnss4uid, gnss5uid, gnss6uid,
+		gnss7uid, gnss8uid, gnss9uid, gnss10uid, gnss11uid, gnss12uid
     );
 
     SendStartLiveData(&devobj, 0);
-    InitPipes();
+    InitPipes(pipe_flags);
 
     while (true)
     {
-    	read_live_data();
-		send_live_data();
+    	read_live_data(pipe_flags);
+		send_live_data(pipe_flags);
     }
-    DestroyPipes();
+    DestroyPipes(pipe_flags);
 
     //close(_pipe_can0_rx);
     return 0;

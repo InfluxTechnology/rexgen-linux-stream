@@ -10,9 +10,18 @@
 #define pipe_buffer_size 512
 #define max_queue_buffers 10
 
+static const unsigned short flag_can0 = 1 << 0;
+static const unsigned short flag_can1 = 1 << 1;
+static const unsigned short flag_gnss = 1 << 2;
+static const unsigned short flag_gyro = 1 << 3;
+static const unsigned short flag_acc = 1 << 4;
+static const unsigned short flag_dig = 1 << 5;
+static const unsigned short flag_adc = 1 << 6;
+
 static const char* dir_rexgen = "/var/run/rexgen";
 static const char* can0 = "can0";
 static const char* can1 = "can1";
+static const char* gnss = "gnss";
 static const char* gyro = "gyro";
 static const char* acc = "acc";
 static const char* dig = "dig";
@@ -68,6 +77,12 @@ pthread_t can1rx;
 unsigned char data_can1rx[pipe_buffer_size];
 unsigned long datasize_can1rx;
 
+// Gnss Rx pipe
+static pthread_mutex_t mutex_gnss_rx = PTHREAD_MUTEX_INITIALIZER;
+pthread_t gnssrx;
+unsigned char data_gnssrx[pipe_buffer_size];
+unsigned long datasize_gnssrx;
+
 // Gyro Rx pipe
 static pthread_mutex_t mutex_gyro_rx = PTHREAD_MUTEX_INITIALIZER;
 pthread_t gyrorx;
@@ -95,7 +110,7 @@ unsigned long datasize_adcrx;
 
 typedef char* TxCanRow[68];
 
-bool InitPipes();
-void DestroyPipes();
+bool InitPipes(unsigned short pipe_flags);
+void DestroyPipes(unsigned short pipe_flags);
 
 #endif

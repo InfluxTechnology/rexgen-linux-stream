@@ -6,6 +6,7 @@ const debug = console.log; // Set to false to remove debug
 
 const can0pipePath = '/var/run/rexgen/can0/rx';
 const can1pipePath = '/var/run/rexgen/can1/rx';
+const gnsspipePath = '/var/run/rexgen/gnss/rx';
 const accpipePath = '/var/run/rexgen/acc/rx';
 const gyropipePath = '/var/run/rexgen/gyro/rx';
 const digitalpipePath = '/var/run/rexgen/dig/rx';
@@ -148,12 +149,13 @@ async function run()
 		outputstream = fs.createWriteStream(arg[2]);
 	}
 
-	new Promise((resolve) => { startCanReader(can0pipePath, 0); });
-	new Promise((resolve) => { startCanReader(can1pipePath, 1); });
-	new Promise((resolve) => { startSensorReader(accpipePath, "Accelerometer"); });
-	new Promise((resolve) => { startSensorReader(gyropipePath, "Gyroscope"); });
-	new Promise((resolve) => { startSensorReader(digitalpipePath, "Digital"); });
-	new Promise((resolve) => { startSensorReader(adcpipePath, "ADC"); });
+	//new Promise((resolve) => { startCanReader(can0pipePath, 0); });
+	//new Promise((resolve) => { startCanReader(can1pipePath, 1); });
+	new Promise((resolve) => { startSensorReader(gnsspipePath, "Gnss"); });
+	//new Promise((resolve) => { startSensorReader(accpipePath, "Accelerometer"); });
+	//new Promise((resolve) => { startSensorReader(gyropipePath, "Gyroscope"); });
+	//new Promise((resolve) => { startSensorReader(digitalpipePath, "Digital"); });
+	//new Promise((resolve) => { startSensorReader(adcpipePath, "ADC"); });
 }
 
 run();
