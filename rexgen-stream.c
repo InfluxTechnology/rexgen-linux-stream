@@ -145,7 +145,6 @@ void parse_live_data(unsigned short pipe_flags)
 			unsigned int timestamp = ((unsigned int*)(data + pos + 4))[0];
 			unsigned long recsize = 4 + infSize + dlc;
 
-			printf("New record: %i\n", uid);
 			if (uid == 0)
 			{
 
