@@ -10,6 +10,8 @@
 #include "rexgen-stream.h"
 #include "../rexusb/commands.h"
 
+static unsigned short pipe_flags = 0;
+
 char* add_msg_val(char msg[], unsigned int val, char type)
 {
     char *s[50];
@@ -551,9 +553,11 @@ void* execute_io(void* ptr)
 
 void* execute_usb(void* ptr)
 {
+	unsigned short flags = pipe_flags;
 	while (true)
 	{
-		parse_live_data(*(unsigned short *)ptr);
+		//printf("pipe %i\n", ptr);
+		parse_live_data(flags);
 		//read_live_data();
 	};
 }
@@ -590,8 +594,9 @@ void InitFifo(char* name, bool tx, bool rx)
 	}
 }
 
-bool InitPipes(unsigned short pipe_flags)
+bool InitPipes(unsigned short flags)
 {
+	pipe_flags = flags;
 	umask(0);
 	struct stat st = {0};
 	if (stat(dir_rexgen, &st) == -1)
@@ -602,7 +607,7 @@ bool InitPipes(unsigned short pipe_flags)
 	pthread_create(&io, NULL, &execute_io, NULL);
 
 	// Can0
-	if (flag_can0 & pipe_flags)
+	if (pipe_flags & flag_can0)
 	{
 		InitFifo(can0, true, true);
 		datasize_can0tx = 0;
@@ -664,12 +669,12 @@ bool InitPipes(unsigned short pipe_flags)
 	// Usb receiver
 	queue.qidx1 = 0;
 	queue.qidx2 = 0;
-	pthread_create(&usb, NULL, &execute_usb, &pipe_flags);
+	pthread_create(&usb, NULL, &execute_usb, NULL);
 
 	return true;
 }
 
-void DestroyPipes(unsigned short pipe_flags)
+void DestroyPipes()
 {
 	// IO
 	pthread_exit(&io);

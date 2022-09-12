@@ -41,7 +41,6 @@ typedef struct
 // Main Usb object
 DeviceStruct devobj;
 
-
 // Main Communicaton thread
 //static pthread_mutex_t mutex_io = PTHREAD_MUTEX_INITIALIZER;
 pthread_t io;
@@ -110,7 +109,7 @@ unsigned long datasize_adcrx;
 
 typedef char* TxCanRow[68];
 
-bool InitPipes(unsigned short pipe_flags);
-void DestroyPipes(unsigned short pipe_flags);
+bool InitPipes(unsigned short flags);
+void DestroyPipes();
 
 #endif

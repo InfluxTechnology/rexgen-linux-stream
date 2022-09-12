@@ -68,7 +68,7 @@ void printkBuffer(void *data, int len, char* prefix)
         printf("%s: %s - %s", "ReX", prefix, buff);
 }
 
-void parse_live_data(unsigned short flags)
+void parse_live_data(unsigned short pipe_flags)
 {
 	bool isAccelerometer(unsigned short uid)
 	{
@@ -145,11 +145,12 @@ void parse_live_data(unsigned short flags)
 			unsigned int timestamp = ((unsigned int*)(data + pos + 4))[0];
 			unsigned long recsize = 4 + infSize + dlc;
 
+			printf("New record: %i\n", uid);
 			if (uid == 0)
 			{
 
 			}
-			else if (flags & flag_can0 && uid == can0uid)
+			else if ((pipe_flags & flag_can0) && uid == can0uid)
 			{
 				pthread_mutex_lock(&mutex_can0_rx);
 				if (datasize_can0rx + recsize > pipe_buffer_size)
@@ -158,7 +159,7 @@ void parse_live_data(unsigned short flags)
 				datasize_can0rx+= recsize;
 				pthread_mutex_unlock(&mutex_can0_rx);
 			}
-			else if (flags & flag_can1 && uid == can1uid)
+			else if ((pipe_flags & flag_can1) && uid == can1uid)
 			{
 				pthread_mutex_lock(&mutex_can1_rx);
 				if (datasize_can1rx + recsize > pipe_buffer_size)
@@ -167,7 +168,7 @@ void parse_live_data(unsigned short flags)
 				datasize_can1rx+= recsize;
 				pthread_mutex_unlock(&mutex_can1_rx);
 			}
-   			else if (flags & flag_acc && isAccelerometer(uid))
+   			else if ((pipe_flags & flag_acc) && isAccelerometer(uid))
    			{
 				pthread_mutex_lock(&mutex_acc_rx);
 				if (datasize_accrx + recsize > pipe_buffer_size)
@@ -176,7 +177,7 @@ void parse_live_data(unsigned short flags)
 				datasize_accrx+= recsize;
 				pthread_mutex_unlock(&mutex_acc_rx);
    			}
- 			else if (flags & flag_gyro && isGyroscope(uid))
+ 			else if ((pipe_flags & flag_gyro) && isGyroscope(uid))
  			{
 				pthread_mutex_lock(&mutex_gyro_rx);
 				if (datasize_gyrorx + recsize > pipe_buffer_size)
@@ -185,7 +186,7 @@ void parse_live_data(unsigned short flags)
 				datasize_gyrorx+= recsize;
 				pthread_mutex_unlock(&mutex_gyro_rx);
  			}
- 			else if (flags & flag_dig && isDigital(uid))
+ 			else if ((pipe_flags & flag_dig) && isDigital(uid))
  			{
 				pthread_mutex_lock(&mutex_dig_rx);
 				if (datasize_digrx + recsize > pipe_buffer_size)
@@ -194,7 +195,7 @@ void parse_live_data(unsigned short flags)
 				datasize_digrx+= recsize;
 				pthread_mutex_unlock(&mutex_dig_rx);
  			}
- 			else if (flags & flag_adc && isADC(uid))
+ 			else if ((pipe_flags & flag_adc) && isADC(uid))
  			{
 				pthread_mutex_lock(&mutex_adc_rx);
 				if (datasize_adcrx + recsize > pipe_buffer_size)
@@ -203,7 +204,7 @@ void parse_live_data(unsigned short flags)
 				datasize_adcrx+= recsize;
 				pthread_mutex_unlock(&mutex_adc_rx);
  			}
- 			else if (flags & flag_gnss && isGnss(uid))
+ 			else if ((pipe_flags & flag_gnss) && isGnss(uid))
  			{
 				pthread_mutex_lock(&mutex_gnss_rx);
 				if (datasize_gnssrx + recsize > pipe_buffer_size)
@@ -219,11 +220,7 @@ void parse_live_data(unsigned short flags)
 	//usleep(1);
 }
 
-void get_send_live_data()
-{
-}
-
-void send_live_data(unsigned short flags)
+void send_live_data(unsigned short pipe_flags)
 {
 	EndpointCommunicationStruct *ep = &devobj.ep[epLive];
 
@@ -251,9 +248,9 @@ void send_live_data(unsigned short flags)
 
 	}
 
-	if (flags & flag_can0)
+	if (pipe_flags & flag_can0)
 		PipeToCan(0, &mutex_can0_tx, &datasize_can0tx, &data_can0tx);
-	if (flags & flag_can1)
+	if (pipe_flags & flag_can1)
 		PipeToCan(1, &mutex_can1_tx, &datasize_can1tx, &data_can1tx);
 }
 
@@ -316,21 +313,21 @@ int main (int argc, char *argv[])
     	pipe_flags |= flag_can0;
     if (can1uid != 0)
     	pipe_flags |= flag_can1;
-    if (accXuid !=0 || accYuid !=0 || accZuid != 0)
+    if (accXuid != 0 || accYuid != 0 || accZuid != 0)
     	pipe_flags |= flag_acc;
-    if (gyroXuid !=0 || gyroYuid !=0 || gyroZuid !=0)
+    if (gyroXuid != 0 || gyroYuid != 0 || gyroZuid != 0)
     	pipe_flags |= flag_gyro;
-    if (dig0uid !=0 || dig1uid !=0)
+    if (dig0uid != 0 || dig1uid != 0)
     	pipe_flags |= flag_dig;
-    if (adc0uid !=0 || adc1uid !=0 || adc2uid !=0 || adc3uid !=0)
+    if (adc0uid != 0 || adc1uid != 0 || adc2uid != 0 || adc3uid != 0)
     	pipe_flags |= flag_adc;
-    if (gnss0uid !=0 || gnss1uid !=0 || gnss2uid !=0 || gnss3uid !=0 || gnss4uid !=0 ||
-    	gnss5uid !=0 || gnss6uid !=0 ||	gnss7uid !=0 || gnss8uid !=0 || gnss9uid !=0 ||
-    	gnss10uid !=0 || gnss11uid !=0 || gnss12uid !=0)
+    if (gnss0uid != 0 || gnss1uid != 0 || gnss2uid != 0 || gnss3uid != 0 || gnss4uid != 0 ||
+    	gnss5uid != 0 || gnss6uid != 0 ||	gnss7uid != 0 || gnss8uid != 0 || gnss9uid != 0 ||
+    	gnss10uid != 0 || gnss11uid != 0 || gnss12uid != 0)
     	pipe_flags |= flag_gnss;
 
     printf(
-    	"Detected UIDs:\n"
+    	"Detected UIDs (%i):\n"
     	"CAN 0/1 - %i/%i\n"
     	"Accelerometer X/Y/Z - %i/%i/%i\n"
     	"Gyroscope X/Y/Z - %i/%i/%i\n"
@@ -339,6 +336,7 @@ int main (int argc, char *argv[])
     	"GNSS: Latitude - %i, Longitude - %i, Altitude - %i, Datetime - %i, SpeedOverGround - %i, "
     	"GroundDistance - %i, CourseOverGround - %i, GeoidSeparation - %i, NumberSatellites - %i, "
     	"Quality - %i, HorizontalAccuracy - %i, VerticalAccuracy - %i, SpeedAccuracy - %i\r\n",
+    	pipe_flags,
     	can0uid, can1uid, 
     	accXuid, accYuid, accZuid, 
     	gyroXuid, gyroYuid, gyroZuid,
@@ -353,10 +351,10 @@ int main (int argc, char *argv[])
 
     while (true)
     {
-    	read_live_data(pipe_flags);
+    	read_live_data();
 		send_live_data(pipe_flags);
     }
-    DestroyPipes(pipe_flags);
+    DestroyPipes();
 
     //close(_pipe_can0_rx);
     return 0;
