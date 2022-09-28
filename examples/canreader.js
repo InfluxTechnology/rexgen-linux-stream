@@ -6,6 +6,8 @@ const debug = console.log; // Set to false to remove debug
 
 const can0pipePath = '/var/run/rexgen/can0/rx';
 const can1pipePath = '/var/run/rexgen/can1/rx';
+const can2pipePath = '/var/run/rexgen/can2/rx';
+const can3pipePath = '/var/run/rexgen/can3/rx';
 const gnsspipePath = '/var/run/rexgen/gnss/rx';
 const accpipePath = '/var/run/rexgen/acc/rx';
 const gyropipePath = '/var/run/rexgen/gyro/rx';
@@ -151,6 +153,8 @@ async function run()
 
 	//new Promise((resolve) => { startCanReader(can0pipePath, 0); });
 	//new Promise((resolve) => { startCanReader(can1pipePath, 1); });
+	//new Promise((resolve) => { startCanReader(can2pipePath, 2); });
+	//new Promise((resolve) => { startCanReader(can3pipePath, 3); });
 	new Promise((resolve) => { startSensorReader(gnsspipePath, "Gnss"); });
 	//new Promise((resolve) => { startSensorReader(accpipePath, "Accelerometer"); });
 	//new Promise((resolve) => { startSensorReader(gyropipePath, "Gyroscope"); });

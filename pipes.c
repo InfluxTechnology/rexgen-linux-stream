@@ -121,7 +121,6 @@ void CanRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsigned
 
 void* execute_can0rx(void* ptr)
 {
-	//CanRx(can0, &mutex_rx_pipe, &datasize_can0rx, &data_can0rx);
 	CanRx(can0, &mutex_can0_rx, &datasize_can0rx, &data_can0rx);
 
     return NULL;
@@ -129,8 +128,21 @@ void* execute_can0rx(void* ptr)
 
 void* execute_can1rx(void* ptr)
 {
-	//CanRx(can1, &mutex_rx_pipe, &datasize_can1rx, &data_can1rx);
 	CanRx(can1, &mutex_can1_rx, &datasize_can1rx, &data_can1rx);
+
+    return NULL;
+}
+
+void* execute_can2rx(void* ptr)
+{
+	CanRx(can2, &mutex_can2_rx, &datasize_can2rx, &data_can2rx);
+
+    return NULL;
+}
+
+void* execute_can3rx(void* ptr)
+{
+	CanRx(can3, &mutex_can3_rx, &datasize_can3rx, &data_can3rx);
 
     return NULL;
 }
@@ -339,6 +351,18 @@ void* execute_can1tx(void* ptr)
     return NULL;
 }
 
+void* execute_can2tx(void* ptr)
+{
+	CanTx(can2, 1202, &mutex_can2_tx, &datasize_can2tx, &data_can2tx);
+    return NULL;
+}
+
+void* execute_can3tx(void* ptr)
+{
+	CanTx(can3, 1203, &mutex_can3_tx, &datasize_can3tx, &data_can3tx);
+    return NULL;
+}
+
 char* UidToStringName(unsigned short uid)
 {
 	if (uid == gyroXuid || uid == accXuid)
@@ -399,11 +423,15 @@ void FloatWriter(char* targetstr, unsigned short uid, unsigned int timestamp, ch
 	);
 }
 
-void DoubleOrFloatWriter(char* targetstr, unsigned short uid, unsigned int timestamp, char* data)
+void GnssWriter(char* targetstr, unsigned short uid, unsigned int timestamp, char* data)
 {
 	if (uid == gnss0uid || uid == gnss1uid)
 		sprintf(targetstr, "(%u) %s %f\n", timestamp, 
 			UidToStringName(uid), ((double*)(data))[0]
+		);
+	else if (uid == gnss3uid)
+		sprintf(targetstr, "(%u) %s %u\n", timestamp, 
+			UidToStringName(uid), ((unsigned int*)(data))[0]
 		);
 	else
 		sprintf(targetstr, "(%u) %s %f\n", timestamp, 
@@ -468,7 +496,7 @@ void SensorRx(char* name, pthread_mutex_t* mutex, unsigned long* datasize, unsig
 
 void* execute_gnssrx(void* ptr)
 {
-	SensorRx(gnss, &mutex_gnss_rx, &datasize_gnssrx, &data_gnssrx, &DoubleOrFloatWriter);
+	SensorRx(gnss, &mutex_gnss_rx, &datasize_gnssrx, &data_gnssrx, &GnssWriter);
     return NULL;
 }
 
@@ -626,6 +654,26 @@ bool InitPipes(unsigned short flags)
 		pthread_create(&can1rx, NULL, &execute_can1rx, NULL);
 	}
 
+	// Can2
+	if (flag_can2 & pipe_flags)
+	{
+		InitFifo(can2, true, true);
+		datasize_can2tx = 0;
+		pthread_create(&can2tx, NULL, &execute_can2tx, NULL);
+		datasize_can2rx = 0;
+		pthread_create(&can2rx, NULL, &execute_can2rx, NULL);
+	}
+
+	// Can3
+	if (flag_can3 & pipe_flags)
+	{
+		InitFifo(can3, true, true);
+		datasize_can3tx = 0;
+		pthread_create(&can3tx, NULL, &execute_can3tx, NULL);
+		datasize_can3rx = 0;
+		pthread_create(&can3rx, NULL, &execute_can3rx, NULL);
+	}
+
 	// Gnss
 	if (flag_gnss & pipe_flags)
 	{
@@ -702,6 +750,24 @@ void DestroyPipes()
 		pthread_mutex_destroy(&mutex_can1_rx);
 	}
 	
+	// Can2
+	if (flag_can2 & pipe_flags)
+	{
+		pthread_exit(&can2tx);
+		pthread_mutex_destroy(&mutex_can2_tx);
+		pthread_exit(&can2rx);
+		pthread_mutex_destroy(&mutex_can2_rx);
+	}
+
+	// Can3
+	if (flag_can3 & pipe_flags)
+	{
+		pthread_exit(&can3tx);
+		pthread_mutex_destroy(&mutex_can3_tx);
+		pthread_exit(&can3rx);
+		pthread_mutex_destroy(&mutex_can3_rx);
+	}
+
 	// Gnss
 	if (flag_gnss & pipe_flags)
 	{

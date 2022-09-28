@@ -2,6 +2,7 @@
 // v1.5 - added sys pipe with support of NFC
 // v1.6 - added canfd support, adc and digital support
 // v1.7 - added gnss support, added 2 more adc
+// v1.8 - added support for can2 and can3
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -167,6 +168,24 @@ void parse_live_data(unsigned short pipe_flags)
 				datasize_can1rx+= recsize;
 				pthread_mutex_unlock(&mutex_can1_rx);
 			}
+			else if ((pipe_flags & flag_can2) && uid == can2uid)
+			{
+				pthread_mutex_lock(&mutex_can2_rx);
+				if (datasize_can2rx + recsize > pipe_buffer_size)
+					datasize_can2rx = 0;
+				memcpy(&(data_can2rx[datasize_can2rx]), &(data[pos]), recsize);
+				datasize_can2rx+= recsize;
+				pthread_mutex_unlock(&mutex_can2_rx);
+			}
+			else if ((pipe_flags & flag_can3) && uid == can3uid)
+			{
+				pthread_mutex_lock(&mutex_can3_rx);
+				if (datasize_can3rx + recsize > pipe_buffer_size)
+					datasize_can3rx = 0;
+				memcpy(&(data_can3rx[datasize_can3rx]), &(data[pos]), recsize);
+				datasize_can3rx+= recsize;
+				pthread_mutex_unlock(&mutex_can3_rx);
+			}
    			else if ((pipe_flags & flag_acc) && isAccelerometer(uid))
    			{
 				pthread_mutex_lock(&mutex_acc_rx);
@@ -251,6 +270,10 @@ void send_live_data(unsigned short pipe_flags)
 		PipeToCan(0, &mutex_can0_tx, &datasize_can0tx, &data_can0tx);
 	if (pipe_flags & flag_can1)
 		PipeToCan(1, &mutex_can1_tx, &datasize_can1tx, &data_can1tx);
+	if (pipe_flags & flag_can2)
+		PipeToCan(2, &mutex_can2_tx, &datasize_can2tx, &data_can2tx);
+	if (pipe_flags & flag_can3)
+		PipeToCan(3, &mutex_can3_tx, &datasize_can3tx, &data_can3tx);
 }
 
 void read_live_data()
@@ -287,7 +310,7 @@ int main (int argc, char *argv[])
     
     if (check_arg("-v") == 1)
     {	
-        printf("1.7 \n");
+        printf("1.8 \n");
 		return;
     }
 
@@ -312,6 +335,10 @@ int main (int argc, char *argv[])
     	pipe_flags |= flag_can0;
     if (can1uid != 0)
     	pipe_flags |= flag_can1;
+    if (can2uid != 0)
+    	pipe_flags |= flag_can2;
+    if (can3uid != 0)
+    	pipe_flags |= flag_can3;
     if (accXuid != 0 || accYuid != 0 || accZuid != 0)
     	pipe_flags |= flag_acc;
     if (gyroXuid != 0 || gyroYuid != 0 || gyroZuid != 0)
@@ -327,7 +354,7 @@ int main (int argc, char *argv[])
 
     printf(
     	"Detected UIDs (%i):\n"
-    	"CAN 0/1 - %i/%i\n"
+    	"CAN 0/1/2/3 - %i/%i/%i/%i\n"
     	"Accelerometer X/Y/Z - %i/%i/%i\n"
     	"Gyroscope X/Y/Z - %i/%i/%i\n"
     	"Digital 0/1 - %i/%i\n"
@@ -336,7 +363,7 @@ int main (int argc, char *argv[])
     	"GroundDistance - %i, CourseOverGround - %i, GeoidSeparation - %i, NumberSatellites - %i, "
     	"Quality - %i, HorizontalAccuracy - %i, VerticalAccuracy - %i, SpeedAccuracy - %i\r\n",
     	pipe_flags,
-    	can0uid, can1uid, 
+    	can0uid, can1uid, can2uid, can3uid,
     	accXuid, accYuid, accZuid, 
     	gyroXuid, gyroYuid, gyroZuid,
     	dig0uid, dig1uid,
