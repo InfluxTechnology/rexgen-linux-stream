@@ -5,7 +5,7 @@
 
 #include <pthread.h>
 #include <stdbool.h>
-#include "../rexusb/communication.h"
+#include "./comm/communication.h"
 
 #define pipe_buffer_size 512
 #define max_queue_buffers 10

@@ -18,8 +18,8 @@
 #include "./pipes.h"
 #include "./rexgen-stream.h"
 
-#include "../rexusb/communication.h"
-#include "../rexusb/commands.h"
+#include "./comm/communication.h"
+#include "./comm/commands.h"
 
 void handleSIGINT(int sig_num)
 {
