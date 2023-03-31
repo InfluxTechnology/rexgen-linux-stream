@@ -1,7 +1,7 @@
 #ifndef _inf_communication_
 #define _inf_communication_
 
-#include "../libusb.h"
+#include "libusb.h"
 #include <stdbool.h>
 
 #define TRANSFER_BLOCK_SIZE 0x4000

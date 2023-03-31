@@ -8,7 +8,7 @@
 #include <errno.h>
 
 #include "rexgen-stream.h"
-#include "./comm/commands.h"
+#include "commands.h"
 
 static unsigned short pipe_flags = 0;
 

@@ -15,11 +15,11 @@
 #include <signal.h>
 #include <pthread.h>
 
-#include "./pipes.h"
-#include "./rexgen-stream.h"
+#include "pipes.h"
+#include "rexgen-stream.h"
 
-#include "./comm/communication.h"
-#include "./comm/commands.h"
+#include "communication.h"
+#include "commands.h"
 
 void handleSIGINT(int sig_num)
 {
