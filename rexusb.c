@@ -17,7 +17,7 @@
 // 1.9	Option to check NFC hardware
 // 1.10	Option to shutdown the device
 // 1.11	Added commands to set/get system date and time 
-// 1.12	Show rexgen-stream version
+// 1.13	Show rexgen-stream version
 
 DeviceStruct DeviceObj;
 
@@ -157,7 +157,7 @@ int exec(char *command) {
 int main(int argc, char *argv[]) 
 {
 	int VERSION_MAJOR = 1;
-	int VERSION_MINOR = 12;
+	int VERSION_MINOR = 13;
 
 	void print_versions ()
 	{
