@@ -5,7 +5,6 @@
 
 extern int CANDebugMode, RebootAfterReflash;
 bool HideRequest;
-//char HOST[];
 
 typedef struct
 {

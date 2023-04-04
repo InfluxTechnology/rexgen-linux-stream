@@ -112,7 +112,6 @@ void BuildCheckSum(unsigned char* data, unsigned short count)
 
 void BuildCmmd(EndpointCommunicationStruct *cmdobj, const cmmdStruct *cmd)
 {
-//for (int i = 0; i < cmd->tx_len; i++) printf("%i ", cmd->cmd_data[i]);
 	cmdobj->tx_data[0] = Seq++;
 	unsigned short len = cmd->tx_len + 4;
 	memcpy(&cmdobj->tx_data[1], &len, sizeof(len));
@@ -120,14 +119,10 @@ void BuildCmmd(EndpointCommunicationStruct *cmdobj, const cmmdStruct *cmd)
 	BuildCheckSum((unsigned char*)cmdobj->tx_data, len);
 	cmdobj->tx_len = len;
 	cmdobj->rx_len = cmd->rx_len;
-//printf("%i \n", cmdobj->tx_len); // 
-//for (int i = 0; i < len; i++) printf("%i ", cmdobj->tx_data[i]); // 
-//for (int i = 0; i < cmd->rx_len; i++) printf("%i ", cmdobj->rx_data[i]); // 
 }
 
 void BuildCustomCmmd(EndpointCommunicationStruct *cmdobj, unsigned char tx_len, unsigned char rx_len, unsigned char *cmd)
 {
-//printf("%i %i \n", tx_len, rx_len); // 
 	cmdobj->tx_data[0] = Seq++;
 	unsigned short len = tx_len + 4;
 	memcpy(&cmdobj->tx_data[1], &len, sizeof(len));
@@ -135,7 +130,6 @@ void BuildCustomCmmd(EndpointCommunicationStruct *cmdobj, unsigned char tx_len, 
 	BuildCheckSum((unsigned char*)cmdobj->tx_data, len);
 	cmdobj->tx_len = len;
 	cmdobj->rx_len = rx_len;
-//for (int i = 0; i < len; i++) printf("%i ", cmdobj->tx_data[i]); // 
 }
 
 void PrintTxCmmd(EndpointCommunicationStruct *ep)
@@ -156,8 +150,6 @@ void PrintRxCmmd(EndpointCommunicationStruct *ep)
 	if (CANDebugMode == 1)
 	{
 		printf("Received   : ");
-//		printf("%.2X", ep->rx_len);
-//		printf("\n");
 		for(int j = 0; j < ep->rx_len; j++)
 			printf("%.2X ", ep->rx_data[j]);
 		printf("\n");
@@ -221,20 +213,12 @@ void PrintLiveData(EndpointCommunicationStruct *ep)
 	unsigned short blockSize = 0;
 	unsigned short pos = 2;
 	blockSize =  ((unsigned short*)ep->rx_data)[0];
-	/*printf("Block Size is: %d\n", blockSize);
-	printf("rxlen is: %d\n", ep->rx_len);
-	for(int j = 0; j < ep->rx_len; j++)
-			printf("%.2X ", ep->rx_data[j]); //DEBUG	
-		printf("\n");*/
 	while (pos < blockSize)	
 	{
 		unsigned short uid = ((unsigned short*)(ep->rx_data + pos))[0];
 		unsigned char infSize = ep->rx_data[pos + 2];
-		//printf("infSize is: %d\n", infSize);
 		unsigned char dlc = ep->rx_data[pos + 3];
 		unsigned int timestamp = ((unsigned int*)(ep->rx_data + pos + 4))[0];
-		//printf("uid %d ", uid);
-		//printf("supported %d\n", ChannelSupported(uid));
 		if (ChannelSupported(uid) == 0)  // All uid that can be displayed
 		{
 			printf("%u", timestamp);
@@ -276,17 +260,11 @@ unsigned char SendCommand(DeviceStruct *devobj, unsigned char endpoint_id, const
 	EndpointCommunicationStruct *ep = &devobj->ep[endpoint_id];
 	BuildCmmd(ep, cmmd);
 	PrintTxCmmd(ep);
-//for (int i = 0; i < ep->tx_len; i++) {printf("%i ",  ep->tx_data[i]); fflush(stdout);}
-//printf("\n %i \n",  ep->tx_len); fflush(stdout);
-
 	UsbSend(devobj, endpoint_id);
 	sleep(0.1);
 
 	unsigned char res = UsbRead(devobj, endpoint_id);
 
-//for (int i = 0; i < ep->rx_len; i++) {printf("%i ",  ep->rx_data[i]); fflush(stdout);}
-//printf("\n %i \n",  ep->rx_len); fflush(stdout);
-//printf("%i\n", HideRequest);
 	if (!HideRequest)
 		PrintRxCmmd(ep);
 	HideRequest = true;
@@ -314,26 +292,8 @@ unsigned char SendCustomCommand(DeviceStruct *devobj, unsigned char endpoint_id,
 		return 6;
 }
 
-/*void BuildGNSSDataCmmd(COMMUNICATION_STRUCT *cmdobj, unsigned char tx_len, unsigned char rx_len, unsigned char *cmd)
-{
-	memcpy(&cmdobj->tx_data[0], cmd, tx_len);
-///
-	cmdobj->tx_len = tx_len;
-	cmdobj->rx_len = rx_len;
-}*/
-
 void SendGNSSData(DeviceStruct *devobj, structGNSSData *GNSSData)
-{
-    /*unsigned char cmd_data[21];// = {0x1E, 0x00};	
-	memcpy(&cmd_data[0], GNSSData, sizeof(structGNSSData));
-	devobj->endpoint = 3;
-	BuildGNSSDataCmmd(&devobj->msg, sizeof(structGNSSData), 1, (unsigned char*)&cmd_data);
-
-	if (CANDebugMode == 1)
-		PrintTxCmmd(devobj);
-//printf("%i \n", devobj->msg.tx_data[0]);
-	UsbSend(devobj);*/
-
+{
 	SendCustomCommand(devobj, epLive, sizeof(structGNSSData), 1, (unsigned char*)&GNSSData);
 	if (CANDebugMode == 1)
 		PrintTxCmmd(devobj);
@@ -355,22 +315,10 @@ void SendStartLiveData(DeviceStruct *devobj, unsigned char channel)
 //	devobj->endpoint = 2;
 }
 
-/*void ReadLiveData(DeviceStruct *devobj, unsigned char channel)
-{
-	devobj->msg.rx_len = 512;
-	UsbRead(devobj, epLive);
-
-	//PrintRxCmmd(devobj);
-	PrintLiveData(devobj);
-}*/
-
 void SendInitBus(DeviceStruct *devobj, initStruct *cmmdInit)
 {
 	EndpointCommunicationStruct *ep = &devobj->ep[epData];
 	unsigned char cmd_data[18] = {0x1D, 0x00};	
-	/*printf("initStructSize: ");
-	printf("%i", sizeof(initStruct));
-	printf("\n");*/
 	memcpy(&cmd_data[2], cmmdInit, sizeof(initStruct));
 
 	if (CANDebugMode == 1)
@@ -412,17 +360,10 @@ void RequestCanRX(DeviceStruct *devobj, cmdRequestRX *cmdRX)
 	{
 		//sleep(0.005);
 		SendCustomCommand(devobj, epData, 7, 8 + sizeof(CAN_TX_RX_STRUCT), (unsigned char*)&cmd_data);
-
-		/*for(int j = 0; j < 7; j++)
-			printf("%.2X ", cmd_data[j]);
-		printf("\n");*/
-
+
 		if (ep->rx_data[5] != 0 || ep->rx_data[6] != 0)
 		{
 			received = 1;
-
-			//printf("breaked");
-			//printf("%d", i);
 			break;
 		}		
 	}
@@ -564,9 +505,6 @@ unsigned char GetConfig(DeviceStruct *devobj)   //read configuration and get the
 			blockType = ((unsigned short*)(pBinCfg + currentPos))[0];
 			blockSize = ((unsigned short*)(pBinCfg + currentPos + 4))[0];
 			uid = ((unsigned short*)(pBinCfg + currentPos + 6))[0];
-			//printf("BlockType: %d\n", blockType);
-			//printf("BlockSize: %d\n", blockSize);
-			//printf("uid: %d\n", uid);
 			unsigned char interfaceID;
 			unsigned char direction;
 			switch (blockType)
@@ -701,9 +639,6 @@ void ApplyReflash(DeviceStruct* devobj)
 {
 	char host[256];
 	GetHostName(host);
-//	bool isNano = false;
-//	if (strcmp(host, "imx8mnea-ucom") == 0 || strcmp(host, "imx8mmea-ucom") == 0) 
-//	    isNano = true;
 	bool isNano = strcmp(host, "imx8mnea-ucom") == 0 || strcmp(host, "imx8mmea-ucom") == 0;
 
 	if (isNano)
@@ -730,7 +665,7 @@ void ApplyReflash(DeviceStruct* devobj)
 		time(&timer2);
 		seconds = difftime(timer2, timer1);
 		//	InitUsbLibrary();
-		printf("\rApply reflashing ... %c ", chars[c % sizeof(chars)]);
+		printf("\rApplying reflash ... %c ", chars[c % sizeof(chars)]);
 		fflush(stdout);
 
 		c++;
@@ -766,9 +701,6 @@ char* GetHostName(char res[])
 
 int UsbSendRead(DeviceStruct* devobj, unsigned char endpoint_id, bool flag)
 {
-//		unsigned short len, sendCRC, readCRC;
-//		len = devobj->msg.tx_len;
-//		sendCRC = devobj->msg.tx_data[len - 1];
 	if (UsbSend(devobj, endpoint_id) != 0)
 		return 1;
 	sleep(0.1);
@@ -966,13 +898,13 @@ unsigned char SendConfig(DeviceStruct* devobj, char* filename)
 	bRes = UsbSend(devobj, epData);
 	if (bRes != 0)		
 		return 0;
-	////////////////	
+
 	msg = &(ep->rx_data[0]);
 	len = 8;
 	bRes = UsbRead(devobj, epData);
 	if (bRes != 0)	 
 		return 0;
-	//PrintRxCmmd(devobj);
+
 	msg = &(ep->tx_data[0]);
 	StartAddress = 0;
 
@@ -1032,7 +964,7 @@ unsigned char SendConfig(DeviceStruct* devobj, char* filename)
 	len = 8;
 	bRes = UsbRead(devobj, epData);
 	bRes = ep->rx_data[5];
-    //printf("%d\n", bRes);
+
  	if (bRes == 0)
  		printf("Configuration Uploaded Successfully\n");
  	else if (bRes == 1)

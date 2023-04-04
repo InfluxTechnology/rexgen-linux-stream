@@ -39,7 +39,6 @@ bool InitDevice(DeviceStruct *devobj, unsigned short vendor, unsigned short prod
 	{
 		// Debug output
 		perror("Cannot open device");
-//		printf("Cannot open device\n");
 		
 		return false;
 	}
