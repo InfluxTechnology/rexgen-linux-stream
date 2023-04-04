@@ -310,7 +310,7 @@ int main (int argc, char *argv[])
     
     if (check_arg("-v") == 1)
     {	
-        printf("1.8 \n");
+        printf("Stream tool	1.8 \n");
 		return;
     }
 
