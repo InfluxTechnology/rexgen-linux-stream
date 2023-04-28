@@ -133,7 +133,6 @@ unsigned char GetConfig(DeviceStruct *devobj);
 int ReadFile();
 void Reflash(DeviceStruct* devobj, char* filename);
 void ApplyReflash(DeviceStruct* devobj);
-void GreenLED_status(bool greenLEDstatus);
 char* GetHostName(char res[]);
 unsigned char SendConfig(DeviceStruct* devobj, char* filename);
 void SendGNSSData(DeviceStruct *devobj, structGNSSData *GNSSData);	

@@ -14,8 +14,6 @@ unsigned int PrgMax;
 char PrgStr[] = "";
 unsigned int PrgPos;
 unsigned short PrgCnt = 10;
-// Green LED blink vars
-bool GreenLEDStatus;
 unsigned int Time_Interval;
 struct timeval Time_Before, Time_After;
 int CANDebugMode, RebootAfterReflash;
@@ -29,78 +27,6 @@ void ProgressPos(unsigned int prgPos)
 	PrgPos = proc;
 	printf("\r%s %d %c ", PrgStr, proc, 37);
 	fflush(stdout);
-}
-
-void GreenLED_time(double greenLEDtime)
-{
-	if (greenLEDtime == 0)
-	{
-		gettimeofday(&Time_Before, NULL);
-		Time_Interval = 0;
-		GreenLEDStatus = false;
-		GreenLED_status(GreenLEDStatus);
-		return;
-	}
-
-	struct timeval time_Result;
-	unsigned long timeLED = greenLEDtime * 1000;// must be in micro seconds
-
-	gettimeofday(&Time_After, NULL);
-	timersub(&Time_After, &Time_Before, &time_Result);
-	Time_Interval += time_Result.tv_usec;
-
-	if (Time_Interval > timeLED)
-	{
-		gettimeofday(&Time_Before, NULL);
-		Time_Interval = 0;
-		GreenLEDStatus = !GreenLEDStatus;
-		GreenLED_status(GreenLEDStatus);
-	}
-}
-
-void GreenLED_status(bool greenLEDstatus)
-{
-
-	if (access("/home/root/rexusb/green_led.sh", F_OK) == 0)
-	{
-		if (greenLEDstatus)
-			system("/home/root/rexusb/green_led.sh 1");
-		else
-			system("/home/root/rexusb/green_led.sh 0");
-	}
-
-}
-
-void PrepareGreenLED(bool create)
-{
-return;		// not exists green LED in QP-build (exists only in Aplha boaurd)    
-	char pwd[256], glf[256];
-	if (getcwd(pwd, sizeof(pwd)) != NULL)
-	{
-//    	    strcat(glf, "/home/root/rexusb/green_led.sh");
-		strcpy(glf, pwd);
-		strcat(glf, "/green_led.sh");
-	}
-
-//	strcat(glf, "/home/root/rexusb/green_led.sh");
-	if (access(glf, F_OK) == 0)
-		remove(glf);
-
-	if (!create)
-		return;
-
-	// create temp file to helping set/reset green LED
-	FILE* fp;
-	fp = fopen(glf, "w");
-	fprintf(fp, "#!/bin/sh\n\n");
-	fprintf(fp, "# set/reset GREEN led\n");
-	fprintf(fp, "if [ $1 == %c0%c ]; then\n", 34, 34);
-	fprintf(fp, "    echo 0 > /sys/class/gpio/gpio140/value\n");
-	fprintf(fp, "else\n");
-	fprintf(fp, "    echo 1 > /sys/class/gpio/gpio140/value\n");
-	fprintf(fp, "fi\n");
-	fclose(fp);
-	system("chmod +x /home/root/rexusb/green_led.sh");
 }
 
 void BuildCheckSum(unsigned char* data, unsigned short count)
@@ -641,9 +567,6 @@ void ApplyReflash(DeviceStruct* devobj)
 	GetHostName(host);
 	bool isNano = strcmp(host, "imx8mnea-ucom") == 0 || strcmp(host, "imx8mmea-ucom") == 0;
 
-	if (isNano)
-		PrepareGreenLED(true);
-
 	time_t timer1, timer2;
 	double seconds;
 	unsigned short c = 0;
@@ -654,14 +577,11 @@ void ApplyReflash(DeviceStruct* devobj)
 	time(&timer2);
 	seconds = difftime(timer2, timer1);
 
-	GreenLED_time(0);
 	if (isNano)
 		secondsCount = 15;
 
 	while (seconds < secondsCount)
 	{
-		GreenLED_time(300);
-
 		time(&timer2);
 		seconds = difftime(timer2, timer1);
 		//	InitUsbLibrary();
@@ -673,11 +593,8 @@ void ApplyReflash(DeviceStruct* devobj)
 	}
 	printf("\rReflashing done.          \n");
 
-	GreenLED_status(true);
 	if (isNano)
 	{
-		PrepareGreenLED(false);
-
 		// rebooting
 		if ( RebootAfterReflash == 1)
 		{

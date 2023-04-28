@@ -2,6 +2,7 @@
 #include "communication.h"
 #include "commands.h"
 #include "string.h"
+//#include "bsd/string.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
@@ -149,7 +150,7 @@ int exec(char *command) {
 	// use buffer to read and add to result
 	if (fgets(buffer, 128, pipe) != NULL)
 	    strcpy(result, buffer);
-    
+
    pclose(pipe);
    return atoi(result);
 }
@@ -180,7 +181,7 @@ int main(int argc, char *argv[])
 		}
         }
 
-	if (exec("systemctl list-unit-files rexgen_data.service | wc -l") > 3)
+//	if (exec("systemctl list-unit-files rexgen_data.service | wc -l") > 3)
             system("systemctl stop rexgen_data.service");
 
         RebootAfterReflash = 1;
@@ -403,7 +404,7 @@ int main(int argc, char *argv[])
 	ReleaseDevice(&DeviceObj);
 	ReleaseUsbLibrary();
 
-	if (exec("systemctl list-unit-files rexgen_data.service | wc -l") > 3)
+//	if (exec("systemctl list-unit-files rexgen_data.service | wc -l") > 3)
 		system("systemctl start rexgen_data.service");
 	return 0;
 }
