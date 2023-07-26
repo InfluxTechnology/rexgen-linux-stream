@@ -3,6 +3,30 @@
 #define NOT_FOUND -1
 #include "communication.h"
 
+// Indexes of data in page formats
+#define	SN_IDX_VERSION		0
+#define	SN_IDX_LOCATION		1
+#define	SN_IDX_BATCH		2
+#define	SN_IDX_NUMBER		3
+#define	SN_IDX_SHORT		4
+#define	SN_IDX_LONG		5
+#define	HW_IDX_VERSION		0
+#define	HW_IDX_ASSEMBLY_DATE	1
+#define	HW_IDX_BOARD_TYPE	2
+#define	HW_IDX_NUM_CANFD	3
+#define	HW_IDX_NUM_DIG_IN	4
+#define	HW_IDX_NUM_DIG_OUT	5
+#define	HW_IDX_NUM_ANALOG_IN	6
+#define	HW_IDX_CAN0		7
+#define	HW_IDX_CAN1		8
+#define	HW_IDX_CAN2		9
+#define	HW_IDX_CAN3		10
+#define	HW_IDX_LIN		11
+#define	HW_IDX_GNSS		12
+#define	HW_IDX_ACCELEROMETER	13
+#define	HW_IDX_MMC		14
+#define	HW_IDX_MOBILE_MODEM	15
+
 extern int CANDebugMode, RebootAfterReflash;
 bool HideRequest;
 
@@ -78,8 +102,8 @@ typedef struct
 #pragma pack(pop)
 
 static const cmmdStruct cmmdGetFirmwareVersion = {2, 15,  {0x02, 0x00}}; 
-static const cmmdStruct cmmdConfigInfo = {2, 26,  {0x10, 0x00}}; 
-static const cmmdStruct cmmdGetSerialNumber = {2, 16,  {0x21, 0x00}}; 
+static const cmmdStruct cmmdGetHWSettings = {2, 134,  {0x22, 0x00}}; 
+static const cmmdStruct cmmdGetSerialNumber = {2, 134,  {0x15, 0x00}}; 
 static const cmmdStruct cmmdUSBStartLiveData = {3, 7,  {0x19, 0x00, 0x00}}; //Third Param is Channel 
 static const cmmdStruct cmmdUSBStopLiveData = {3, 7,  {0x1A, 0x00, 0}};  //Third Param is Channel
 static const cmmdStruct cmmdUSBGetLiveData = {3, 16,  {0x83, 0x00, 0}};  //Third Param is Channel
@@ -90,6 +114,8 @@ static const cmmdStruct cmmd42 = {4, 10,  {0x42, 0x00}};
 static const cmmdStruct cmmd43 = {4, 16,  {0x43, 0x00}};
 static const cmmdStruct cmmdGetNFC = {2, 18,  {0x44, 0x00}}; 
 static const cmmdStruct cmmdForceGoDeepSleep = {2, 6,  {0x45, 0x00}}; 
+static const cmmdStruct cmmdGetEEPROMPage2 = {3, 70,  {0x23, 0x00, 0x02}}; //	SN page 
+static const cmmdStruct cmmdGetEEPROMPage3 = {3, 70,  {0x23, 0x00, 0x03}}; //	HW config page
 static cmmdStruct cmmdDateSet = {6, 6,  {0x12, 0x00}};
 static const cmmdStruct cmmdDateGet = {2, 10,  {0x11, 0x00}}; 
 

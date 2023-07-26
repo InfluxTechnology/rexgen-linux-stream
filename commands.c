@@ -186,6 +186,8 @@ unsigned char SendCommand(DeviceStruct *devobj, unsigned char endpoint_id, const
 	EndpointCommunicationStruct *ep = &devobj->ep[endpoint_id];
 	BuildCmmd(ep, cmmd);
 	PrintTxCmmd(ep);
+///ep->timeout = 4000;
+///printf("DEBUG %i \n", ep->timeout);
 	UsbSend(devobj, endpoint_id);
 	sleep(0.1);
 
@@ -889,4 +891,96 @@ unsigned char SendConfig(DeviceStruct* devobj, char* filename)
  	else if (bRes == 2)
  		printf("Configuration Error\n");
 	return bRes;
+}
+
+
+char BoardTypeStr[6][12] = {"ReXgen", "Alpha Board", "Pave BCM", "ReXgen AIR", "Redge", "KTC2"};
+char InterfaceState[2][10] = {"N/A", "Integrated"};
+char GNSSTypeStr[6][15] = {"N/A", "NEO M8L", "NEO M8U", "NEO M8Q", "Modem(Embedded)", "MEO M9N"};
+char AccelerometeTypeStr[2][12] = {"N/A", "STLSM6DS33"};
+char MobileModemTypeStr[4][12] = {"N/A", "SARA R5XX", "LARA R2XX", "Quectel"};
+
+unsigned char PageFormat[70];
+unsigned char PageData[128];
+
+unsigned char PosInPage(char idx)
+{
+	unsigned char pos = 0;
+	for (int i = 0; i < idx; i++) 
+	    pos = pos + PageFormat[i];
+	return pos;
+}
+
+long long GetValue(DeviceStruct* devobj, char idx)
+{
+	char len = PageFormat[idx];
+	long long val = 0;	
+	unsigned char pos = PosInPage(idx);	
+
+	for (int i = pos + len -1; i >= pos; i--) 
+		val = (val << 8) | PageData[i];
+	return val;
+}
+
+void GetSerialNumber(DeviceStruct* devobj, char idx_sn)
+{
+	if (SendCommand(devobj, 0,  &cmmdGetEEPROMPage2) == 0)
+	{
+		EndpointCommunicationStruct *ep = &devobj->ep[0];
+		for (int i = 0; i < 65; i++) PageFormat[i] = ep->rx_data[i + 5];
+
+		if (SendCommand(devobj, 0, &cmmdGetSerialNumber) == 0)
+		{
+			unsigned char pos = PosInPage(idx_sn);	
+
+			if (idx_sn == SN_IDX_LONG)
+				printf("SN long		");
+			else
+				printf("SN short	");
+
+			for (int i = idx_sn; i < PageFormat[idx_sn] + idx_sn; i++)
+		    		printf("%c", ep->rx_data[i + pos]);
+			printf("\n");
+		}
+	}
+}
+
+void GetHWSettings(DeviceStruct* devobj)
+{
+	if (SendCommand(devobj, 0,  &cmmdGetEEPROMPage3) == 0)
+	{
+		EndpointCommunicationStruct *ep = &devobj->ep[0];
+		for (int i = 0; i < 65; i++) PageFormat[i] = ep->rx_data[i + 5];
+
+		if (SendCommand(devobj, 0, & cmmdGetHWSettings) == 0)
+		{
+    			for (int i = 0; i < 123; i++) PageData[i] = ep->rx_data[i + 5];
+
+			// board properties
+			time_t seconds = GetValue(devobj, HW_IDX_ASSEMBLY_DATE);
+			int idx = GetValue(devobj, HW_IDX_BOARD_TYPE) - 1;
+			printf("Board 		Type 		%s\n		HW version	%i\n		Assembly date	%s\n", 
+				BoardTypeStr[idx], GetValue(devobj, HW_IDX_VERSION), asctime(gmtime(&seconds)));    
+
+			// interfaces
+			printf("Interfaces	CAN0 (FD)	%s\n		CAN1 (FD)	%s\n		CAN2		%s\n		CAN3		%s\n		LIN		%s\n\n", 
+				InterfaceState[GetValue(devobj, HW_IDX_CAN0)],
+				InterfaceState[GetValue(devobj, HW_IDX_CAN1)],
+				InterfaceState[GetValue(devobj, HW_IDX_CAN2)],
+				InterfaceState[GetValue(devobj, HW_IDX_CAN3)],
+				InterfaceState[GetValue(devobj, HW_IDX_LIN)]);
+
+			// busses
+			printf("Busses		Digital IN	%i\n		Digital OUT	%i\n		Analogue	%i\n\n",
+				GetValue(devobj, HW_IDX_NUM_DIG_IN),
+				GetValue(devobj, HW_IDX_NUM_DIG_OUT),
+				GetValue(devobj, HW_IDX_NUM_ANALOG_IN)); 
+
+			// periphery
+			printf("Periphery	GNSS		%s\n		Accelerometer	%s\n		Mobile modem	%s\n",
+				GNSSTypeStr[GetValue(devobj, HW_IDX_GNSS)],
+				AccelerometeTypeStr[GetValue(devobj, HW_IDX_ACCELEROMETER)],
+				MobileModemTypeStr[GetValue(devobj, HW_IDX_MOBILE_MODEM)]);
+		}
+	}
 }

@@ -7,7 +7,7 @@
 #include <signal.h>
 #include <time.h>
 
-//#define BYTES_TO_UINT32(B0,B1,B2,B3) (((uint32_t) ((unsigned char) B3)) & 255)<<32 | (((unsigned char) B2)&255)<<16
+#define BYTES_TO_UINT32(B0,B1,B2,B3) (((uint32_t) ((unsigned char) B3)) & 255)<<32 | (((unsigned char) B2)&255)<<16
 
 // 1.2	Help for commands and parameters usage
 //	Firmware version command
@@ -18,7 +18,7 @@
 // 1.10	Option to shutdown the device
 // 1.11	Added commands to set/get system date and time 
 // 1.13	Show rexgen-stream version
-// 1.14 Fixed get configuration command (for diagnostic of hardware configuration)
+// 1.14 Added command to get EEPROM page format (for diagnostic of hardware configuration)
 //	fixed get serial number command
 
 DeviceStruct DeviceObj;
@@ -290,13 +290,21 @@ int main(int argc, char *argv[])
 				}
 			        else if (strcmp(argv[i + 1], "get") == 0)
 				{
-					SendCommand(&DeviceObj, 0, &cmmdDateGet);
+					unsigned int seconds;
+					char buf[80];
+					struct tm *info;
 
-					time_t seconds = DeviceObj.ep[0].rx_data[8] << 24 | 
+					SendCommand(&DeviceObj, 0, &cmmdDateGet);
+					seconds = DeviceObj.ep[0].rx_data[8] << 24 | 
 						DeviceObj.ep[0].rx_data[7] << 16 | 
 						DeviceObj.ep[0].rx_data[6] << 8 | 
 						DeviceObj.ep[0].rx_data[5];
-				        printf("%s", asctime(gmtime(&seconds)));
+
+					info = localtime((time_t)&seconds);
+					strftime(buf, sizeof(buf), "%a %d-%m-%Y %H:%M:%S %Z", info);
+					printf("%s\n", buf);
+
+//					PrintDate(seconds);
 				}
 			}
 
