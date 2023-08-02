@@ -7,8 +7,6 @@
 #include <signal.h>
 #include <time.h>
 
-//#define BYTES_TO_UINT32(B0,B1,B2,B3) (((uint32_t) ((unsigned char) B3)) & 255)<<32 | (((unsigned char) B2)&255)<<16
-
 // 1.2	Help for commands and parameters usage
 //	Firmware version command
 //	Implemented firmware reflash command
@@ -133,8 +131,6 @@ void checkArg(char *arg[])
     else if (strcmp(arg, "shutdown") == 0)
 	flag = true;
     else if (strcmp(arg, "date") == 0)
-	flag = true;
-    else if (strcmp(arg, "test") == 0)
 	flag = true;
 
     if (!flag)
@@ -336,20 +332,6 @@ int main(int argc, char *argv[])
 				};
 
 				SendInitBus(&DeviceObj, &cmmdInit);
-			}
-			else if (strcmp(argv[i], "test") == 0)
-			{
-			    structGNSSData GNSSData;
-			    GNSSData.UID = 200;
-			    GNSSData.InfSize = 9;
-			    GNSSData.DLC = 8;
-			    GNSSData.TimeStamp = 11223344;
-			    GNSSData.CANID = 0x300;
-			    GNSSData.CANFlag = 0;
-			    for (int j = 0; j < 7; j++)
-				GNSSData.Data[j] = 0xFF;
-
-			    SendGNSSData(&DeviceObj, &GNSSData);
 			}
 			else if (strcmp(argv[i], "cansend") == 0 || strcmp(argv[i], "cansendext") == 0)
 			{

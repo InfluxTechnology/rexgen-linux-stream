@@ -3,6 +3,7 @@
 // v1.6 - added canfd support, adc and digital support
 // v1.7 - added gnss support, added 2 more adc
 // v1.8 - added support for can2 and can3
+// v1.9 - added 1000us sample rate parsing live data 
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -235,7 +236,7 @@ void parse_live_data(unsigned short pipe_flags)
     		pos += recsize;   //skip bytes from unknown frames
 		}
 	}
-	//usleep(1);
+	usleep(1000);
 }
 
 void send_live_data(unsigned short pipe_flags)
@@ -310,7 +311,7 @@ int main (int argc, char *argv[])
     
     if (check_arg("-v") == 1)
     {	
-        printf("Stream tool	1.8 \n");
+        printf("Stream tool	1.9 \n");
 		return;
     }
 
