@@ -104,6 +104,7 @@ typedef struct
 static const cmmdStruct cmmdGetFirmwareVersion = {2, 15,  {0x02, 0x00}}; 
 static const cmmdStruct cmmdGetHWSettings = {2, 134,  {0x22, 0x00}}; 
 static const cmmdStruct cmmdGetSerialNumber = {2, 134,  {0x15, 0x00}}; 
+static const cmmdStruct cmmdGetStructName = {2, 200,  {0x1C, 0x00}}; 
 static const cmmdStruct cmmdUSBStartLiveData = {3, 7,  {0x19, 0x00, 0x00}}; //Third Param is Channel 
 static const cmmdStruct cmmdUSBStopLiveData = {3, 7,  {0x1A, 0x00, 0}};  //Third Param is Channel
 static const cmmdStruct cmmdUSBGetLiveData = {3, 16,  {0x83, 0x00, 0}};  //Third Param is Channel
@@ -148,6 +149,8 @@ unsigned short gnss9uid; // Quality
 unsigned short gnss10uid; // HorizontalAccuracy
 unsigned short gnss11uid; // VerticalAccuracy
 unsigned short gnss12uid; // SpeedAccuracy
+char NameStruct[256];
+char UUIDArr[16];
 
 unsigned char SendCommand(DeviceStruct *devobj, unsigned char endpoint_id, const cmmdStruct *cmmd);
 void SendStartLiveData(DeviceStruct *devobj, unsigned char channel);

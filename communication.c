@@ -1,4 +1,4 @@
-#include "libusb.h"
+#include <libusb.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include "communication.h"

@@ -18,6 +18,8 @@
 // 1.13	Show rexgen-stream version
 // 1.14 Fixed get configuration command (for diagnostic of hardware configuration)
 //	fixed get serial number command
+// 1.15
+//	Added command to get current structure name 
 
 DeviceStruct DeviceObj;
 
@@ -95,10 +97,11 @@ void checkArg(char *arg[])
 	printf("	shutdown	 	Shut down the device\n");
 	printf("	version			Show versions of config and stream tools\n");
 	printf("	firmware		Show device firmware version\n");
-	printf("	serial	[short]		Show device serial number in long or short format\n");
-	printf("	hwinfo                  Show info for connected hardware\n");
+	printf("	serial	[short]		Show device serial number in selected format\n");
+	printf("	hwinfo                  Show hardware configuration and info for connected devices\n");
 	printf("	date	set|get		Set/get system date and time to/from device\n");
-	printf("	config			Show device configuration\n");
+	printf("	config			Show configuration name and UUID\n");
+	printf("	configure *.rxc		Send configuration <*.rxc file>, created by RexDesk, to the device\n");
 	printf("	reflash *.bin		Reflash device with <*.bin file> firmware\n");
 	printf("	configure *.rxc		Send configuration <*.rxc file>, created by RexDesk, to the device\n\n");
     }
@@ -132,6 +135,8 @@ void checkArg(char *arg[])
 	flag = true;
     else if (strcmp(arg, "date") == 0)
 	flag = true;
+    else if (strcmp(arg, "test") == 0)
+	flag = true;
 
     if (!flag)
     {
@@ -163,11 +168,11 @@ int exec(char *command) {
 int main(int argc, char *argv[]) 
 {
 	int VERSION_MAJOR = 1;
-	int VERSION_MINOR = 14;
+	int VERSION_MINOR = 15;
 
 	void print_versions ()
 	{
-    		printf("Config tool	%i.%i \n", VERSION_MAJOR, VERSION_MINOR);
+    		printf("Config tool 	%i.%i \n", VERSION_MAJOR, VERSION_MINOR);
 		// uncomment to show stream version
 //		system("/home/root/rexusb/rexgen_stream -v");
 	}
@@ -256,10 +261,15 @@ int main(int argc, char *argv[])
 			}
 			else if (strcmp(argv[i], "config") == 0)
 			{
-				GetHWSettings(&DeviceObj);
+				GetConfig(&DeviceObj);
+				printf("Config. name	%s\n", NameStruct);
+				PrintUUID();
 			}
 			else if (strcmp(argv[i], "hwinfo") == 0)
 			{
+				GetHWSettings(&DeviceObj);
+				printf("\n");
+
 				SendCommand(&DeviceObj, 0, &cmmd41);
 				SendCommand(&DeviceObj, 0, &cmmd43);
 				printf("Hardware info	");
@@ -300,6 +310,10 @@ int main(int argc, char *argv[])
 			{
 				SendCommand(&DeviceObj, 0, &cmmdForceGoDeepSleep);
 			}
+			else if (strcmp(argv[i], "test") == 0)
+			{
+			}
+
 // ****** obsolete *******
 			else if (strcmp(argv[i], "initcan") == 0)
 			{

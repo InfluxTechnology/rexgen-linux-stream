@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
-// v1.5 - added sys pipe with support of NFC
-// v1.6 - added canfd support, adc and digital support
-// v1.7 - added gnss support, added 2 more adc
-// v1.8 - added support for can2 and can3
-// v1.9 - added 1000us sample rate parsing live data 
+// v1.5  - added sys pipe with support of NFC
+// v1.6  - added canfd support, adc and digital support
+// v1.7  - added gnss support, added 2 more adc
+// v1.8  - added support for can2 and can3
+// v1.9  - added 1000us sample rate parsing live data 
+// v1.10 - sample rate parsing live data is user defined.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +22,8 @@
 
 #include "communication.h"
 #include "commands.h"
+
+int LiveDataSampleRate = 1000;
 
 void handleSIGINT(int sig_num)
 {
@@ -236,7 +239,8 @@ void parse_live_data(unsigned short pipe_flags)
     		pos += recsize;   //skip bytes from unknown frames
 		}
 	}
-	usleep(1000);
+	usleep(LiveDataSampleRate);
+//	get_live_data_rate();
 }
 
 void send_live_data(unsigned short pipe_flags)
@@ -297,6 +301,43 @@ void read_live_data()
 	}
 }
 
+int get_live_data_rate()
+{
+    char buff[10];
+    float res;
+    
+    // write in this file sampe rate in [ms]. values must be from 0.1 to 10.
+    char FRateFile[255] = "/home/root/rexusb/config/live_data_sample_rate_in_ms";
+    if (access(FRateFile, F_OK) != 0)
+    {
+        FILE *fp;
+	fp = fopen(FRateFile, "w+");
+	fprintf(fp, "%d\n", 1);
+	fclose(fp);
+    }
+
+    char FRateCmd[5] = "cat "; 
+    strcat(FRateCmd, FRateFile);
+
+    FILE *frate = popen(&FRateCmd, "r");
+    if (frate == NULL)
+	return -1;
+
+    while (fgets(buff, sizeof(buff), frate) != NULL) { }
+    res = (float)atof(buff);
+
+    pclose(frate);
+    if (res != 0)
+	LiveDataSampleRate = abs(res * 1000);
+    if (LiveDataSampleRate > 10000)
+	    LiveDataSampleRate = 10000;
+    if (LiveDataSampleRate < 100)
+	    LiveDataSampleRate = 100;
+    
+    printf("buff: %s; res: %f; Rate: %i \n", buff, res, LiveDataSampleRate);
+    return LiveDataSampleRate;
+}
+
 int main (int argc, char *argv[])
 {
     int check_arg(char *arg)
@@ -311,9 +352,11 @@ int main (int argc, char *argv[])
     
     if (check_arg("-v") == 1)
     {	
-        printf("Stream tool	1.9 \n");
+        printf("Stream tool	1.10\n");
 		return;
     }
+
+    get_live_data_rate();
 
 //    if (exec("ps | grep rexgen_data | wc -l") > 1)
 //	return 0;
@@ -379,7 +422,7 @@ int main (int argc, char *argv[])
     while (true)
     {
     	read_live_data();
-		send_live_data(pipe_flags);
+	send_live_data(pipe_flags);
     }
     DestroyPipes();
 

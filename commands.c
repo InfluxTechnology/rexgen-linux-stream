@@ -221,7 +221,8 @@ unsigned char SendCustomCommand(DeviceStruct *devobj, unsigned char endpoint_id,
 }
 
 void SendGNSSData(DeviceStruct *devobj, structGNSSData *GNSSData)
-{
+{
+
 	SendCustomCommand(devobj, epLive, sizeof(structGNSSData), 1, (unsigned char*)&GNSSData);
 	if (CANDebugMode == 1)
 		PrintTxCmmd(devobj);
@@ -288,7 +289,8 @@ void RequestCanRX(DeviceStruct *devobj, cmdRequestRX *cmdRX)
 	{
 		//sleep(0.005);
 		SendCustomCommand(devobj, epData, 7, 8 + sizeof(CAN_TX_RX_STRUCT), (unsigned char*)&cmd_data);
-
+
+
 		if (ep->rx_data[5] != 0 || ep->rx_data[6] != 0)
 		{
 			received = 1;
@@ -366,6 +368,26 @@ void ReadCANMsg(DeviceStruct *devobj, unsigned char bus, unsigned long msgCount)
 			}
 }
 
+void PrintUUID()
+{
+	printf("Config. UUID	");
+	for (int i = 3 ; i >= 0; i--)
+		printf("%x", UUIDArr[i]);
+	printf("-");
+	for (int i = 5 ; i >= 4; i--)
+		printf("%x", UUIDArr[i]);
+	printf("-");
+	for (int i = 7 ; i >= 6; i--)
+		printf("%x", UUIDArr[i]);
+	printf("-");
+	for (int i = 8 ; i <= 9; i++)
+		printf("%x", UUIDArr[i]);
+	printf("-");
+	for (int i = 10 ; i <= 16; i++)
+		printf("%x", UUIDArr[i]);
+	printf("\n");
+}
+
 unsigned char GetConfig(DeviceStruct *devobj)   //read configuration and get the uid for all supported channels
 {
 	EndpointCommunicationStruct *ep = &devobj->ep[epData];
@@ -379,7 +401,7 @@ unsigned char GetConfig(DeviceStruct *devobj)   //read configuration and get the
 		configSize = ((unsigned int*)(ep->rx_data + 21))[0]; 
 		pBinCfg = (unsigned char*)calloc(configSize, 1);
 		//printf("\npBinCfg:%d\n", pBinCfg);
-		printf("\nConfig Size:%d\n", configSize);
+		//printf("\nConfig Size:%d\n", configSize);
 		if (configSize < bufferSize)
 			bufferSize = configSize;
 
@@ -413,6 +435,26 @@ unsigned char GetConfig(DeviceStruct *devobj)   //read configuration and get the
 			blockType = ((unsigned short*)(pBinCfg + currentPos))[0];
 			blockSize = ((unsigned short*)(pBinCfg + currentPos + 4))[0];
 			uid = ((unsigned short*)(pBinCfg + currentPos + 6))[0];
+
+			if (blockType == 1) //Config
+			{	
+				int j = 0;
+    				// UUID
+				for (int i = 0 ; i < 16; i++)
+				{
+					UUIDArr[j] = ((unsigned char*)(pBinCfg + currentPos + 8 + i))[0];
+					j++;
+				}
+
+				// structure Name
+				j = 0;
+				unsigned char nameSize = ((unsigned char*)(pBinCfg + currentPos + 8 + 16 + 2))[0]; 
+				for (int i = 0 ; i < nameSize; i++)
+				{
+					NameStruct[j] = ((unsigned char*)(pBinCfg + currentPos + 8 + 16 + 3 + i))[0];
+					j++;
+				}
+			}
 			if (blockType == 2) //CAN Interface
 			{
 				unsigned char canphys = ((unsigned char*)(pBinCfg + currentPos + 9))[0];
@@ -427,6 +469,7 @@ unsigned char GetConfig(DeviceStruct *devobj)   //read configuration and get the
 			}
 			currentPos += blockSize;
 		}
+
 		currentPos = 0;
 		while (currentPos < configSize)
 		{
@@ -934,7 +977,7 @@ void GetSerialNumber(DeviceStruct* devobj, char idx_sn)
 			unsigned char pos = PosInPage(idx_sn);	
 
 			if (idx_sn == SN_IDX_LONG)
-				printf("SN long		");
+				printf("Serial number	");
 			else
 				printf("SN short	");
 
