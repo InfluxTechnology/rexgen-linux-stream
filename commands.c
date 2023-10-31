@@ -186,8 +186,6 @@ unsigned char SendCommand(DeviceStruct *devobj, unsigned char endpoint_id, const
 	EndpointCommunicationStruct *ep = &devobj->ep[endpoint_id];
 	BuildCmmd(ep, cmmd);
 	PrintTxCmmd(ep);
-///ep->timeout = 4000;
-///printf("DEBUG %i \n", ep->timeout);
 	UsbSend(devobj, endpoint_id);
 	sleep(0.1);
 
@@ -221,8 +219,7 @@ unsigned char SendCustomCommand(DeviceStruct *devobj, unsigned char endpoint_id,
 }
 
 void SendGNSSData(DeviceStruct *devobj, structGNSSData *GNSSData)
-{
-
+{
 	SendCustomCommand(devobj, epLive, sizeof(structGNSSData), 1, (unsigned char*)&GNSSData);
 	if (CANDebugMode == 1)
 		PrintTxCmmd(devobj);
@@ -289,8 +286,7 @@ void RequestCanRX(DeviceStruct *devobj, cmdRequestRX *cmdRX)
 	{
 		//sleep(0.005);
 		SendCustomCommand(devobj, epData, 7, 8 + sizeof(CAN_TX_RX_STRUCT), (unsigned char*)&cmd_data);
-
-
+
 		if (ep->rx_data[5] != 0 || ep->rx_data[6] != 0)
 		{
 			received = 1;
@@ -1027,3 +1023,68 @@ void GetHWSettings(DeviceStruct* devobj)
 		}
 	}
 }
+
+void PrintProcessorType(char value)
+{
+	switch (value)
+	{	
+		case 1:
+			printf("Processor	628 \n");
+			break;
+		case 2:
+			printf("Processor	606 \n");
+			break;
+		case 3:
+			printf("Processor	608 \n");
+			break;
+		case 4:
+			printf("Processor	618 \n");
+			break;
+		default:
+			printf("N/A \n");
+			break;
+	}
+}
+
+void GetProcessorTypeByUSB(DeviceStruct* devobj)
+{
+	SendCommand(devobj, 0, &cmmdGetMicroType);
+
+	EndpointCommunicationStruct *ep = &devobj->ep[0];
+	PrintProcessorType(ep->rx_data[5]);
+}
+
+void GetProcessorTypeFromFile(char* filename)
+{
+	if (access(filename, F_OK) != 0)
+	{
+		if (CANDebugMode == 1)
+			printf("File '%s' not exsists. \n", filename);
+		return;
+	}
+
+	FILE *fp;
+	fp = fopen(filename, "r");
+	if (fp == NULL) 
+	{
+		if (CANDebugMode == 1)
+			printf("File '%s' is empty. \n", filename);
+		return 0;
+	}
+
+	fseek(fp, 0, SEEK_END);
+	unsigned long 	len = ftell(fp);
+	if (len < 0x10009) 
+	{
+		if (CANDebugMode == 1)
+			printf("Can not read processor type. \n", filename);
+		return 0;
+	}	
+
+
+	fseek( fp, 0x10009, SEEK_SET );
+	char c = fgetc(fp);
+	PrintProcessorType(c);
+	fclose(fp);	
+}
+

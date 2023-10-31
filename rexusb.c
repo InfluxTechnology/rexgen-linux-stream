@@ -20,6 +20,9 @@
 //	fixed get serial number command
 // 1.15
 //	Added command to get current structure name 
+// 1.16
+//	Added functions to get processor type from rexgen device and .bin file 
+	
 
 DeviceStruct DeviceObj;
 
@@ -103,7 +106,6 @@ void checkArg(char *arg[])
 	printf("	config			Show configuration name and UUID\n");
 	printf("	configure *.rxc		Send configuration <*.rxc file>, created by RexDesk, to the device\n");
 	printf("	reflash *.bin		Reflash device with <*.bin file> firmware\n");
-	printf("	configure *.rxc		Send configuration <*.rxc file>, created by RexDesk, to the device\n\n");
     }
 
     if (arg == NULL)
@@ -137,6 +139,9 @@ void checkArg(char *arg[])
 	flag = true;
     else if (strcmp(arg, "test") == 0)
 	flag = true;
+    else if (strcmp(arg, "cpu") == 0)
+	flag = true;
+
 
     if (!flag)
     {
@@ -168,7 +173,7 @@ int exec(char *command) {
 int main(int argc, char *argv[]) 
 {
 	int VERSION_MAJOR = 1;
-	int VERSION_MINOR = 15;
+	int VERSION_MINOR = 16;
 
 	void print_versions ()
 	{
@@ -191,6 +196,12 @@ int main(int argc, char *argv[])
 			return 0;
 		}
         }
+
+	if (strcmp(argv[1], "cpu") == 0)
+        {
+		GetProcessorTypeFromFile(argv[2]);
+		return 0;
+	}
 
 	if (exec("systemctl list-unit-files rexgen_data.service | wc -l") > 3)
             system("systemctl stop rexgen_data.service");
@@ -269,10 +280,14 @@ int main(int argc, char *argv[])
 			{
 				GetHWSettings(&DeviceObj);
 				printf("\n");
+				
+				printf("Hardware info	");
+				GetProcessorTypeByUSB(&DeviceObj);
 
 				SendCommand(&DeviceObj, 0, &cmmd41);
 				SendCommand(&DeviceObj, 0, &cmmd43);
-				printf("Hardware info	");
+
+				printf("		");
 				for (int j = 9; j < DeviceObj.ep[0].rx_len -1; j++)
     				    printf("%c", DeviceObj.ep[0].rx_data[j]);
 				printf("\n");
@@ -312,6 +327,7 @@ int main(int argc, char *argv[])
 			}
 			else if (strcmp(argv[i], "test") == 0)
 			{
+GetProcessorTypeFromFile(argv[i+1]);
 			}
 
 // ****** obsolete *******
@@ -356,7 +372,7 @@ int main(int argc, char *argv[])
 					printf("ext");
 				}
 				
-				cmdCan.Bus = atoi(argv[i+1]);				
+				cmdCan.Bus = atoi(argv[i+1]);
 				cmdCan.DLC = atoi(argv[i+2]);
 				cmdCan.ID = (int)strtol(argv[i+3], NULL, 0);
 				cmdCan.TimeStamp = 2000;
