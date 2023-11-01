@@ -225,32 +225,12 @@ int main(int argc, char *argv[])
 			else if (strcmp(argv[i], "firmware") == 0)
 			{
 				SendCommand(&DeviceObj, 0,  &cmmdGetFirmwareVersion);
-				printf("Firmware	%d.%d.%d", DeviceObj.ep[0].rx_data[5] + 0xFF * DeviceObj.ep[0].rx_data[6], DeviceObj.ep[0].rx_data[7],  DeviceObj.ep[0].rx_data[8]);
-
-				// interpretation of type 
-				char type[3] = "";
-    				type[0] = '.';		
-				type[1] = ' ';		
-				type[2] = ' ';		
-    				type[3] = '\0';		
-				switch (DeviceObj.ep[0].rx_data[9])
-				{
-					case 0:
-						type[0] = ' ';
-						break;
-					case 1:
-						type[1] = 'A';
-						break;
-					case 2:
-						type[1] = 'B';
-						break;
-					case 3:
-						type[1] = 'R';
-						type[2] = 'C';
-						break;
-				} 
-				printf("%s ", type);
-				printf("\n");
+				
+				char buff[50];
+				GetFirmware(DeviceObj.ep[0].rx_data[5], DeviceObj.ep[0].rx_data[6],
+					    DeviceObj.ep[0].rx_data[7], DeviceObj.ep[0].rx_data[8],
+					    DeviceObj.ep[0].rx_data[9], buff);
+				printf("%s\n", buff);
 			}
                         else if (strcmp(argv[i], "dontreboot") == 0)
                         {
@@ -281,18 +261,18 @@ int main(int argc, char *argv[])
 				GetHWSettings(&DeviceObj);
 				printf("\n");
 				
-				printf("Hardware info	");
-				GetProcessorTypeByUSB(&DeviceObj);
-
 				SendCommand(&DeviceObj, 0, &cmmd41);
 				SendCommand(&DeviceObj, 0, &cmmd43);
 
-				printf("		");
+				printf("Hardware info	");
 				for (int j = 9; j < DeviceObj.ep[0].rx_len -1; j++)
     				    printf("%c", DeviceObj.ep[0].rx_data[j]);
 				printf("\n");
 
 				SendCommand(&DeviceObj, 0, &cmmd42);
+
+				printf("		");
+				GetProcessorTypeByUSB(&DeviceObj);
 			}
 			else if (strcmp(argv[i], "date") == 0)
 			{

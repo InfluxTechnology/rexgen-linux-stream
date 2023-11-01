@@ -5,6 +5,7 @@
 // v1.8  - added support for can2 and can3
 // v1.9  - added 1000us sample rate parsing live data 
 // v1.10 - sample rate parsing live data is user defined.
+// v1.11 - create a file with enviroment properties like processor type and rexgen firmware
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -338,63 +339,84 @@ int get_live_data_rate()
     return LiveDataSampleRate;
 }
 
+void  GetEnviroment(DeviceStruct *devobj)
+{
+	FILE *fp;
+	char *path[50];
+	char buff[50];
+	sprintf(path, "%s/%s", dir_rexgen, env);
+	fp = fopen(path, "w");
+
+        SendCommand(devobj, 0, &cmmdGetMicroType);
+	EndpointCommunicationStruct *ep = &devobj->ep[0];
+	fprintf(fp, "%s\n", GetProcessorType(ep->rx_data[5], buff));
+
+	SendCommand(devobj, 0,  &cmmdGetFirmwareVersion);
+	fprintf(fp, "%s\n", GetFirmware(
+		ep->rx_data[5], ep->rx_data[6],
+		ep->rx_data[7], ep->rx_data[8],
+		ep->rx_data[9], buff));
+
+	fclose(fp);
+}
+
 int main (int argc, char *argv[])
 {
-    int check_arg(char *arg)
-    {
+	int check_arg(char *arg)
+	{
 		for (int i = 1; i < argc; i++)
 			if (strcmp(argv[i], arg) == 0)
     	    	return 1;
 		return 0;    
-    }
+	}
 
-    int i = 0;
+	int i = 0;
     
-    if (check_arg("-v") == 1)
-    {	
-        printf("Stream tool	1.10\n");
+	if (check_arg("-v") == 1)
+	{	
+    		printf("Stream tool	1.11\n");
 		return;
-    }
+	}
 
-    get_live_data_rate();
+	get_live_data_rate();
 
 //    if (exec("ps | grep rexgen_data | wc -l") > 1)
 //	return 0;
 
-    signal(SIGINT, handleSIGINT);
-    signal(SIGPIPE, handleSIGPIPE);
+	signal(SIGINT, handleSIGINT);
+	signal(SIGPIPE, handleSIGPIPE);
 
-    if (! InitUsbLibrary())
-        return 1;
-    if (! InitDevice(&devobj, 0x16d0, 0x0f14))
-        return 1;
+	if (! InitUsbLibrary())
+    		return 1;
+	if (! InitDevice(&devobj, 0x16d0, 0x0f14))
+    		return 1;
 
-    HideRequest = true;
+	HideRequest = true;
 
 	CANDebugMode = 0;
 	unsigned short pipe_flags = 0;
 
-    GetConfig(&devobj);
-    if (can0uid != 0)
-    	pipe_flags |= flag_can0;
-    if (can1uid != 0)
-    	pipe_flags |= flag_can1;
-    if (can2uid != 0)
-    	pipe_flags |= flag_can2;
-    if (can3uid != 0)
-    	pipe_flags |= flag_can3;
-    if (accXuid != 0 || accYuid != 0 || accZuid != 0)
-    	pipe_flags |= flag_acc;
-    if (gyroXuid != 0 || gyroYuid != 0 || gyroZuid != 0)
-    	pipe_flags |= flag_gyro;
-    if (dig0uid != 0 || dig1uid != 0)
-    	pipe_flags |= flag_dig;
-    if (adc0uid != 0 || adc1uid != 0 || adc2uid != 0 || adc3uid != 0)
-    	pipe_flags |= flag_adc;
-    if (gnss0uid != 0 || gnss1uid != 0 || gnss2uid != 0 || gnss3uid != 0 || gnss4uid != 0 ||
-    	gnss5uid != 0 || gnss6uid != 0 ||	gnss7uid != 0 || gnss8uid != 0 || gnss9uid != 0 ||
-    	gnss10uid != 0 || gnss11uid != 0 || gnss12uid != 0)
-    	pipe_flags |= flag_gnss;
+	GetConfig(&devobj);
+	if (can0uid != 0)
+    		pipe_flags |= flag_can0;
+        if (can1uid != 0)
+		pipe_flags |= flag_can1;
+        if (can2uid != 0)
+		pipe_flags |= flag_can2;
+        if (can3uid != 0)
+		pipe_flags |= flag_can3;
+        if (accXuid != 0 || accYuid != 0 || accZuid != 0)
+		pipe_flags |= flag_acc;
+        if (gyroXuid != 0 || gyroYuid != 0 || gyroZuid != 0)
+		pipe_flags |= flag_gyro;
+        if (dig0uid != 0 || dig1uid != 0)
+		pipe_flags |= flag_dig;
+        if (adc0uid != 0 || adc1uid != 0 || adc2uid != 0 || adc3uid != 0)
+		pipe_flags |= flag_adc;
+        if (gnss0uid != 0 || gnss1uid != 0 || gnss2uid != 0 || gnss3uid != 0 || gnss4uid != 0 ||
+        	gnss5uid != 0 || gnss6uid != 0 ||	gnss7uid != 0 || gnss8uid != 0 || gnss9uid != 0 ||
+		gnss10uid != 0 || gnss11uid != 0 || gnss12uid != 0)
+    	    pipe_flags |= flag_gnss;
 
     printf(
     	"Detected UIDs (%i):\n"
@@ -415,17 +437,18 @@ int main (int argc, char *argv[])
 		gnss0uid, gnss1uid, gnss2uid, gnss3uid, gnss4uid, gnss5uid, gnss6uid,
 		gnss7uid, gnss8uid, gnss9uid, gnss10uid, gnss11uid, gnss12uid
     );
+*/
+        SendStartLiveData(&devobj, 0);
+	GetEnviroment(&devobj);
+        InitPipes(pipe_flags);
 
-    SendStartLiveData(&devobj, 0);
-    InitPipes(pipe_flags);
+	while (true)
+        {
+	    	read_live_data();
+		send_live_data(pipe_flags);
+        }
+	DestroyPipes();
 
-    while (true)
-    {
-    	read_live_data();
-	send_live_data(pipe_flags);
-    }
-    DestroyPipes();
-
-    //close(_pipe_can0_rx);
-    return 0;
+        //close(_pipe_can0_rx);
+	return 0;
 }

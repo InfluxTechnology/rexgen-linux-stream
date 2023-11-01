@@ -31,6 +31,7 @@ static const char* acc = "acc";
 static const char* dig = "dig";
 static const char* adc = "adc";
 static const char* sys = "sys";
+static const char* env = "env";
 
 static const uint io_interval = 1000; // 1 ms
 static const uint nfc_io_cycles = 250;

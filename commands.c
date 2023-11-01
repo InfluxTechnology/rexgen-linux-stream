@@ -219,7 +219,8 @@ unsigned char SendCustomCommand(DeviceStruct *devobj, unsigned char endpoint_id,
 }
 
 void SendGNSSData(DeviceStruct *devobj, structGNSSData *GNSSData)
-{
+{
+
 	SendCustomCommand(devobj, epLive, sizeof(structGNSSData), 1, (unsigned char*)&GNSSData);
 	if (CANDebugMode == 1)
 		PrintTxCmmd(devobj);
@@ -286,7 +287,8 @@ void RequestCanRX(DeviceStruct *devobj, cmdRequestRX *cmdRX)
 	{
 		//sleep(0.005);
 		SendCustomCommand(devobj, epData, 7, 8 + sizeof(CAN_TX_RX_STRUCT), (unsigned char*)&cmd_data);
-
+
+
 		if (ep->rx_data[5] != 0 || ep->rx_data[6] != 0)
 		{
 			received = 1;
@@ -1024,26 +1026,51 @@ void GetHWSettings(DeviceStruct* devobj)
 	}
 }
 
-void PrintProcessorType(char value)
+char *GetFirmware(char b1, char b2, char b3, char b4, char b5, char *res)
+{
+	// interpretation of type 
+	char type[3];
+	switch (b5)
+	{	
+		case 0:
+			strcpy(type, " ");
+			break;
+		case 1:
+			strcpy(type, ".A");
+			break;
+		case 2:
+			strcpy(type, ".B");
+			break;
+		case 3:
+			strcpy(type, ".RC");
+			break;			
+	}
+
+	sprintf(res, "Firmware	%d.%d.%d%s", b1 + 0xFF * b2, b3, b4, type);
+	return res;
+}
+
+char *GetProcessorType(char value, char *res)
 {
 	switch (value)
 	{	
 		case 1:
-			printf("Processor	628 \n");
+			strcpy(res, "Processor	628");
 			break;
 		case 2:
-			printf("Processor	606 \n");
+			strcpy(res, "Processor	606");
 			break;
 		case 3:
-			printf("Processor	608 \n");
+			strcpy(res, "Processor	608");
 			break;
 		case 4:
-			printf("Processor	618 \n");
+			strcpy(res, "Processor	618");
 			break;
 		default:
-			printf("N/A \n");
+			strcpy(res, "Processor	N/A");
 			break;
 	}
+	return res;
 }
 
 void GetProcessorTypeByUSB(DeviceStruct* devobj)
@@ -1051,7 +1078,8 @@ void GetProcessorTypeByUSB(DeviceStruct* devobj)
 	SendCommand(devobj, 0, &cmmdGetMicroType);
 
 	EndpointCommunicationStruct *ep = &devobj->ep[0];
-	PrintProcessorType(ep->rx_data[5]);
+	char buff[50];
+	printf("%s \n", GetProcessorType(ep->rx_data[5], buff));
 }
 
 void GetProcessorTypeFromFile(char* filename)
@@ -1084,7 +1112,9 @@ void GetProcessorTypeFromFile(char* filename)
 
 	fseek( fp, 0x10009, SEEK_SET );
 	char c = fgetc(fp);
-	PrintProcessorType(c);
+	char buff[50];
+	printf("%s \n", GetProcessorType(c, buff));
+
 	fclose(fp);	
 }
 

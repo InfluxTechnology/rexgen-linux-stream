@@ -156,7 +156,7 @@ char UUIDArr[16];
 unsigned char SendCommand(DeviceStruct *devobj, unsigned char endpoint_id, const cmmdStruct *cmmd);
 void SendStartLiveData(DeviceStruct *devobj, unsigned char channel);
 void SendInitBus(DeviceStruct *devobj, initStruct *cmmdInit);
-void SendCANCmd(DeviceStruct *devobj, cmdCANstruct *cmdCAN);		//
+void SendCANCmd(DeviceStruct *devobj, cmdCANstruct *cmdCAN);		
 void ReadLiveData(DeviceStruct *devobj, unsigned char channel);
 void ReadCANMsg(DeviceStruct *devobj, unsigned char bus, unsigned long msgCount);
 unsigned char GetConfig(DeviceStruct *devobj);
@@ -167,5 +167,7 @@ char* GetHostName(char res[]);
 unsigned char SendConfig(DeviceStruct* devobj, char* filename);
 void SendGNSSData(DeviceStruct *devobj, structGNSSData *GNSSData);	
 void ReadUsbData(DeviceStruct *devobj, structGNSSData *GNSSData);	
+char *GetProcessorType(char value, char *res);
+char *GetFirmware(char b1, char b2, char b3, char b4, char b5, char *res);
 
 #endif
