@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <pthread.h>
+#include <dirent.h>
 
 #include "pipes.h"
 #include "rexgen-stream.h"
@@ -341,6 +342,11 @@ int get_live_data_rate()
 
 void  GetEnviroment(DeviceStruct *devobj)
 {
+	DIR* dp;
+	dp = opendir(dir_rexgen);
+	if (dp == NULL)
+		mkdir(dir_rexgen, 0755);
+
 	FILE *fp;
 	char *path[50];
 	char buff[50];
@@ -374,7 +380,7 @@ int main (int argc, char *argv[])
     
 	if (check_arg("-v") == 1)
 	{	
-    		printf("Stream tool	1.11\n");
+    		printf("Stream tool	1.12\n");
 		return;
 	}
 

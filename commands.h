@@ -98,7 +98,7 @@ typedef struct
     unsigned char CANFlag;
     unsigned char Data[8];
 } structGNSSData;
-	
+
 #pragma pack(pop)
 
 static const cmmdStruct cmmdGetFirmwareVersion = {2, 15,  {0x02, 0x00}}; 
