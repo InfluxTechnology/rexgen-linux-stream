@@ -5,7 +5,7 @@
 // v1.8  - added support for can2 and can3
 // v1.9  - added 1000us sample rate parsing live data 
 // v1.10 - sample rate parsing live data is user defined.
-// v1.11 - create a file with enviroment properties like processor type and rexgen firmware
+// v1.12 - create a file with enviroment properties like processor type and rexgen firmware
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -443,7 +443,7 @@ int main (int argc, char *argv[])
 		gnss0uid, gnss1uid, gnss2uid, gnss3uid, gnss4uid, gnss5uid, gnss6uid,
 		gnss7uid, gnss8uid, gnss9uid, gnss10uid, gnss11uid, gnss12uid
     );
-*/
+
         SendStartLiveData(&devobj, 0);
 	GetEnviroment(&devobj);
         InitPipes(pipe_flags);
