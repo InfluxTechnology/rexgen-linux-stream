@@ -2,6 +2,7 @@
 #include <memory.h>
 #include "commands.h"
 #include "communication.h"
+#include "common.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,25 +10,11 @@
 #include <limits.h>
 
 unsigned char Seq;
-// progress vars
-unsigned int PrgMax;
-char PrgStr[] = "";
-unsigned int PrgPos;
-unsigned short PrgCnt = 10;
+
+//unsigned short PrgCnt = 10;
 unsigned int Time_Interval;
 struct timeval Time_Before, Time_After;
 int CANDebugMode, RebootAfterReflash;
-
-
-void ProgressPos(unsigned int prgPos)
-{
-	unsigned short proc = prgPos * 100 / PrgMax;
-	if (PrgPos == proc) return;
-
-	PrgPos = proc;
-	printf("\r%s %d %c ", PrgStr, proc, 37);
-	fflush(stdout);
-}
 
 void BuildCheckSum(unsigned char* data, unsigned short count)
 {
@@ -90,7 +77,6 @@ void PrintRxCmmd(EndpointCommunicationStruct *ep)
 
 void PrintChannelLabel(unsigned short uid)
 {
-	
 	if (uid == accXuid)
 		printf(" accX ");
 	else if (uid == accYuid)
@@ -149,7 +135,7 @@ void PrintLiveData(EndpointCommunicationStruct *ep)
 		{
 			printf("%u", timestamp);
 			PrintChannelLabel(uid);
-			printf(" [%d]", dlc);		
+			printf(" [%d]", dlc);	
 			if (uid == accXuid || uid == accYuid || uid == accZuid || uid == gyroXuid || uid == gyroYuid || uid == gyroZuid)  // Accelerometer and Gyro
 			{
 				for (int i=0; i<dlc; i++)
@@ -220,7 +206,6 @@ unsigned char SendCustomCommand(DeviceStruct *devobj, unsigned char endpoint_id,
 
 void SendGNSSData(DeviceStruct *devobj, structGNSSData *GNSSData)
 {
-
 	SendCustomCommand(devobj, epLive, sizeof(structGNSSData), 1, (unsigned char*)&GNSSData);
 	if (CANDebugMode == 1)
 		PrintTxCmmd(devobj);
@@ -288,7 +273,6 @@ void RequestCanRX(DeviceStruct *devobj, cmdRequestRX *cmdRX)
 		//sleep(0.005);
 		SendCustomCommand(devobj, epData, 7, 8 + sizeof(CAN_TX_RX_STRUCT), (unsigned char*)&cmd_data);
 
-
 		if (ep->rx_data[5] != 0 || ep->rx_data[6] != 0)
 		{
 			received = 1;
@@ -326,7 +310,6 @@ void SendCANCmd(DeviceStruct *devobj, cmdCANstruct *cmdCAN)
 	}
 	memcpy(&cmd_data[2], cmdCAN, sizeof(cmdCANstruct));
 
-
 	printf("can%i ", cmdCAN->Bus);
 	printf("0x%.2X ", cmdCAN->ID);
 	printf("[%i] ", cmdCAN->DLC);
@@ -343,14 +326,12 @@ void SendCANCmd(DeviceStruct *devobj, cmdCANstruct *cmdCAN)
 	RequestCanRX(devobj, &canRX);
 }
 
-
 void ReadCANMsg(DeviceStruct *devobj, unsigned char bus, unsigned long msgCount)
 {
 	cmdRequestRX canRX = {
 		Bus: bus,
 		Timeout: 2000,
 	};
-	
 	
 	if (msgCount > 0)
 	{
@@ -577,32 +558,25 @@ unsigned char GetConfig(DeviceStruct *devobj)   //read configuration and get the
 		
 }
 
-
-
 int ReadFile()
 {
-
-    FILE *fp;
-    unsigned  char* pBinCfg;
-    unsigned int fileSize;
-    fp = fopen("live.bin", "r");
-    fseek(fp, 0L, SEEK_END);
+	FILE *fp;
+	unsigned  char* pBinCfg;
+	unsigned int fileSize;
+	fp = fopen("live.bin", "r");
+	fseek(fp, 0L, SEEK_END);
 	fileSize = ftell(fp);
 	rewind(fp);
 	pBinCfg = (unsigned char*)calloc(fileSize, 1);
-    fread(pBinCfg, fileSize, 1, fp);
-    for (int i = 0; i < fileSize; ++i)
-    {
-    	printf("%.2X ", ((unsigned char*)(pBinCfg))[i] );
-    }
-    printf("\n");
+	fread(pBinCfg, fileSize, 1, fp);
+	for (int i = 0; i < fileSize; ++i)
+		printf("%.2X ", ((unsigned char*)(pBinCfg))[i] );
+
+	printf("\n");
     
-    
-    fclose(fp);
-    return 0;
+	fclose(fp);
+	return 0;
 }
-
-
 
 void ApplyReflash(DeviceStruct* devobj)
 {
@@ -703,7 +677,6 @@ void Reflash(DeviceStruct* devobj, char* filename)
 	fseek(fp, 0, SEEK_END);
 	len = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
-	//*ReflashBuffer = malloc(len); // ne znam kakvo pravi. moje i bez nego
 
 	if (fp == NULL || len == 0) // is file empty
 	{
@@ -740,10 +713,7 @@ void Reflash(DeviceStruct* devobj, char* filename)
 	memTransferSize = memMAXTransferSize;
 	StartAddress = 0;
 
-	PrgMax = MaxAddress;
-	PrgPos = 0;
-	char prgStr[] = "File transfering ...";
-	strcpy(PrgStr, prgStr);
+	ProgressInit(MaxAddress, "File transfering ...");
 
 	while (StartAddress <= (MaxAddress - 1))
 	{
@@ -948,7 +918,7 @@ unsigned char PosInPage(char idx)
 {
 	unsigned char pos = 0;
 	for (int i = 0; i < idx; i++) 
-	    pos = pos + PageFormat[i];
+		pos = pos + PageFormat[i];
 	return pos;
 }
 
@@ -963,7 +933,25 @@ long long GetValue(DeviceStruct* devobj, char idx)
 	return val;
 }
 
-void GetSerialNumber(DeviceStruct* devobj, char idx_sn)
+unsigned long ulongFromRXData(DeviceStruct* devobj, unsigned short idx)
+{
+	unsigned long res;
+	res = devobj->ep[0].rx_data[idx + 0] +
+		(devobj->ep[0].rx_data[idx + 1] << 8) +
+		(devobj->ep[0].rx_data[idx + 2] << 16) +
+		(devobj->ep[0].rx_data[idx + 3] << 24);
+	return res;
+}
+
+unsigned short ushortFromRXData(DeviceStruct* devobj, unsigned short idx)
+{
+	unsigned short res;
+	res = devobj->ep[0].rx_data[idx + 0] +
+		(devobj->ep[0].rx_data[idx + 1] << 8);
+	return res;
+}
+
+unsigned long GetSerialNumber(DeviceStruct* devobj, char idx_sn, char silent)
 {
 	if (SendCommand(devobj, 0,  &cmmdGetEEPROMPage2) == 0)
 	{
@@ -974,16 +962,43 @@ void GetSerialNumber(DeviceStruct* devobj, char idx_sn)
 		{
 			unsigned char pos = PosInPage(idx_sn);	
 
-			if (idx_sn == SN_IDX_LONG)
-				printf("Serial number	");
-			else
-				printf("SN short	");
+			if (silent == 0)
+			{
+				if (idx_sn == SN_IDX_LONG)
+					printf("Serial number	");
+				else
+					printf("SN short	");
+			}
 
 			for (int i = idx_sn; i < PageFormat[idx_sn] + idx_sn; i++)
-		    		printf("%c", ep->rx_data[i + pos]);
-			printf("\n");
+				if (silent == 0)
+					printf("%c", ep->rx_data[i + pos]);
+
+			if (silent == 0)
+				printf("\n");
+
+			// add serial number to config file
+			char buff[7];
+			int j = 0;
+			pos = PosInPage(SN_IDX_SHORT);
+    
+			for (int i = SN_IDX_SHORT + 3; i < PageFormat[SN_IDX_SHORT] + SN_IDX_SHORT; i++)
+				if (ep->rx_data[i + pos] != 0)
+					buff[j++] = ep->rx_data[i + pos];
+
+			conf_file conf;
+			if (CheckConfigFile(&conf) == 0)
+				ReadConfigFile(&conf);
+			sprintf(conf.rex_sn_short, "%s", buff);
+			WriteConfigFile(&conf);
+
+			if (silent == 0)
+				return 0;
+			else
+				return ulongFromRXData(devobj, 11);
 		}
 	}
+	return 0;
 }
 
 void GetHWSettings(DeviceStruct* devobj)
@@ -1043,10 +1058,29 @@ char *GetFirmware(char b1, char b2, char b3, char b4, char b5, char *res)
 			break;
 		case 3:
 			strcpy(type, ".RC");
-			break;			
+			break;	
 	}
 
 	sprintf(res, "Firmware	%d.%d.%d%s", b1 + 0xFF * b2, b3, b4, type);
+	return res;
+}
+
+char *StructDateToStr(DeviceStruct* devobj, int idx, char *fmt, char *res)
+{
+	if (fmt == "")
+		fmt = "%Y-%m-%d %H:%M:%S";
+
+	time_t seconds = devobj->ep[0].rx_data[idx + 3] << 24 | 
+			devobj->ep[0].rx_data[idx + 2] << 16 | 
+			devobj->ep[0].rx_data[idx +1] << 8 | 
+			devobj->ep[0].rx_data[idx];
+	
+	struct tm* tm;
+        char buff[26];
+	tm = gmtime(&seconds);
+        strftime(buff, sizeof(buff), fmt, tm);
+
+	sprintf(res, buff);
 	return res;
 }
 
@@ -1087,7 +1121,7 @@ void GetProcessorTypeFromFile(char* filename)
 	if (access(filename, F_OK) != 0)
 	{
 		if (CANDebugMode == 1)
-			printf("File '%s' not exsists. \n", filename);
+			printf("Error: File '%s' not exsists. \n", filename);
 		return;
 	}
 
@@ -1107,14 +1141,166 @@ void GetProcessorTypeFromFile(char* filename)
 		if (CANDebugMode == 1)
 			printf("Can not read processor type. \n", filename);
 		return 0;
-	}	
-
+	}
 
 	fseek( fp, 0x10009, SEEK_SET );
 	char c = fgetc(fp);
 	char buff[50];
 	printf("%s \n", GetProcessorType(c, buff));
 
-	fclose(fp);	
+	fclose(fp);
 }
 
+unsigned char DownloadRXD(DeviceStruct* devobj, unsigned short logIdx, char checkCount)
+{
+	if (checkCount == 1)
+	{
+		SendCommand(devobj, 0, &cmmdSDGetLogCount);
+		unsigned short count = devobj->ep[0].rx_data[5] + (devobj->ep[0].rx_data[6] << 8);
+		if (logIdx >= count)
+		{
+			printf("Error: Too big log index %i\n", logIdx);
+			return;
+		}
+	}
+
+	log_info info;
+	if (LogInfoRXD(devobj, logIdx, &info) != 0)
+	{
+		printf("ERROR\n");
+		return 1;
+	}
+
+	memcpy((void*)&(cmmdSDRequestSendData.cmd_data[2]), (void*)&(devobj->ep[0].rx_data[25]), 4);
+	memcpy((void*)&(cmmdSDRequestSendData.cmd_data[6]), (void*)&(devobj->ep[0].rx_data[29]), 4);
+
+	unsigned long StartSector = info.sector_start;
+	unsigned long EndSector = info.sector_stop;
+
+	remove(info.name_full);
+	FILE *myfile;
+	myfile = fopen(info.name_full, "wb");
+
+	unsigned long ReturnBytes, ReceivedBytes = 0;
+	unsigned char res = 1;
+	unsigned char* msg[2 * TRANSFER_BLOCK_SIZE];
+	unsigned int emptyloops = 0;
+	unsigned long MaximumTransfer = (2 * TRANSFER_BLOCK_SIZE);
+	unsigned long len = MaximumTransfer;
+	unsigned long ExpectedSize = ((EndSector - StartSector + 1) * 512);
+
+	if (ExpectedSize < MaximumTransfer)
+		len = ExpectedSize;
+
+	devobj->ep[0].timeout = 5000;
+	SendCommand(devobj, 0, &cmmdSDRequestSendData);
+
+	while (ReceivedBytes < ExpectedSize)
+	{
+		res = libusb_bulk_transfer(devobj->handle, 0x83, msg, len, &ReturnBytes, 0);
+
+		ReceivedBytes += ReturnBytes;
+		if (!ReturnBytes)
+			emptyloops++;
+		else
+			emptyloops = 0;
+
+		res = fwrite((char*)msg, ReturnBytes, 1,  myfile);
+
+		if ((ExpectedSize - ReceivedBytes) < MaximumTransfer)
+			len = (ExpectedSize - ReceivedBytes);
+		else
+			len = MaximumTransfer;
+
+		if (emptyloops > 9)
+		{
+			printf("Error: USB communication broken\n");
+			break;
+		}
+	}
+
+	fclose(myfile);
+	return res;
+}
+
+unsigned char PrepareDownloadAllRXD(DeviceStruct* devobj, conf_file *conf)
+{
+	unsigned char result(unsigned short beg, unsigned short end, char full)
+	{
+		ProgressPos(PrgMax);
+		if (full == 1)
+			printf("\nNot enough disk space. Will be loaded logs with indexes from %i to %i \n", beg, end);
+		conf->rxd_idx_beg = beg;
+		conf->rxd_idx_end = end;
+		conf->rxd_folder_full = full;
+		return (unsigned char)full;
+	}	
+
+	unsigned long free = GetAvailableSpace(conf->rxd_folder);
+
+	SendCommand(devobj, 0, &cmmdSDGetLogCount);
+	unsigned short count = devobj->ep[0].rx_data[5] + (devobj->ep[0].rx_data[6] << 8);
+	unsigned short ibeg = (conf->rxd_folder_full == 1) ? conf->rxd_idx_end : 0;
+	unsigned short iend = count;
+	
+	ProgressInit(iend - ibeg, "Preparing ...");
+	unsigned long bytes = 0;
+	for (unsigned short i = ibeg; i < iend; i++)
+	{
+		ProgressPos(PrgMax - (iend - i));
+
+        	cmmdSDGetLogInfo.cmd_data[2] = i;
+		cmmdSDGetLogInfo.cmd_data[3] = i >> 8;
+		SendCommand(devobj, 0, &cmmdSDGetLogInfo);
+		unsigned long cbytes = ulongFromRXData(devobj, 21);
+
+		if (bytes + cbytes > free)
+		{
+			iend = i - 1;
+			return result(ibeg, iend, 1);
+		}
+
+		bytes += cbytes;
+	}
+
+	return result(ibeg, iend, 0);
+}
+
+unsigned char LogInfoRXD(DeviceStruct* devobj, unsigned short logIdx, log_info *info)
+{
+	char *buff[50];
+	cmmdSDGetLogInfo.cmd_data[2] = logIdx;
+	cmmdSDGetLogInfo.cmd_data[3] = logIdx >> 8;
+        SendCommand(devobj, 0, &cmmdSDGetLogInfo);
+        if (devobj->ep[0].rx_data[4] != 0x80)
+	{
+		// log name
+		memcpy((void*)&buff[0], (void*)&devobj->ep[0].rx_data[49], 255);
+		sprintf(info->name, "%s", buff);
+
+		info->time_start = ulongFromRXData(devobj, 5);
+		info->time_stop = ulongFromRXData(devobj, 9);
+
+		info->bytes = ulongFromRXData(devobj, 21);
+		info->sector_start = ulongFromRXData(devobj, 25);
+		info->sector_stop = ulongFromRXData(devobj, 29);
+
+		// full file name
+	        char date_time[50];
+		StructDateToStr(devobj, 5, "_%Y%m%d_%H%M%S", date_time);
+
+		conf_file conf;                         
+		ReadConfigFile(&conf);  
+		CheckFolder(conf.rxd_folder);
+
+		sprintf(info->name_full, "%s%s", conf.rxd_folder, info->name); 		// folder/name
+		sprintf(info->name_full, "%s_%s", info->name_full, conf.rex_sn_short);	// serial number
+////    	sprintf(info->name_full, "%s_%.4d", info->name_full, logIdx);		// log idx
+		strcat(info->name_full, date_time);					// date/time
+		strcat(info->name_full, ".rxd");               
+
+		return 0;
+	}
+	return 1;
+
+}

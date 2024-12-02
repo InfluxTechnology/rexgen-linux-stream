@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "communication.h"
 #include "commands.h"
+#include "common.h"
 #include "string.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -18,13 +19,17 @@
 // 1.13	Show rexgen-stream version
 // 1.14 Fixed get configuration command (for diagnostic of hardware configuration)
 //	fixed get serial number command
-// 1.15
-//	Added command to get current structure name 
-// 1.16
-//	Added functions to get processor type from rexgen device and .bin file 
-	
+// 1.15	Added command to get current structure name 
+// 1.16	Added functions to get processor type from rexgen device and .bin file 
+// 1.17	Support SD card functions
+//	Format, general info		
+//	Log info by index and log count
+//	Download all rxd files and by index.
+//	User configured rxd download folder
+
 
 DeviceStruct DeviceObj;
+bool SDCommandFlag;
 
 void sigintHandler(int sig_num)
 {
@@ -50,33 +55,174 @@ int strpos(char *haystack, char *needle)
     return NOT_FOUND;
 }
 
-void removeMinus(char *arg)
+int usageMsg(char *msg)
 {
-    int i, j;
-    int len = strlen(arg);
-    for(i=0; i<len; i++)
-    {
-        if(arg[i] == '-')
-        {
-            for(j=i; j<len; j++)
-            {
-                arg[j] = arg[j+1];
-            }
-            len--;
-            i--;
-        }
-    }
+	printf("USAGE: \n");
+	printf("	%s\n\n", msg);
+	return 1;	
+}
+
+void printdatef(char *name, int idx)
+{
+	char buff[50];
+	StructDateToStr(&DeviceObj, idx, "%Y-%m-%d %H:%M:%S", buff);
+
+	printf("\t\t%s\t%s\n", name, buff);
 }
 
 int checkDateArg(char *arg[])
 {
 	if ((arg == NULL) || ((strcmp(arg, "set") != 0) && (strcmp(arg, "get") != 0)))
-	{
-		printf("USAGE: \n");
-		printf("	rexgen date set|get\n\n");
-		return 1;
-	}
+		return	usageMsg("rexgen date set|get");		
 	return 0;
+}
+
+int checkSDArg(char *arg1[], char *arg2[])
+{
+	if (arg1 == NULL)
+		return usageMsg("rexgen SD log|rxd|format|info");
+
+	conf_file conf;
+	if (CheckConfigFile(&conf) == 1) 
+		GetSerialNumber(&DeviceObj, SN_IDX_SHORT, 1);
+	SDCommandFlag = true;
+
+	if (strcmp(arg1, "log") == 0)
+	{
+		if (arg2 == NULL)
+			return usageMsg("rexgen SD log count|0..COUNT-1");
+
+	    	if (strcmp(arg2, "count") == 0)
+		{
+			SendCommand(&DeviceObj, 0, &cmmdSDGetLogCount);
+			printf("SD log count	%d\n", DeviceObj.ep[0].rx_data[5] + 0xFF * DeviceObj.ep[0].rx_data[6]);	
+			return 0;
+		}
+
+		if (strspn(arg2, "0123456789") == strlen(arg2))
+		{
+			short logIdx = atoi(arg2);
+			log_info info;
+			if (LogInfoRXD(&DeviceObj, logIdx, &info) == 0)
+			{
+				printf("SD log info %i\n", logIdx);
+
+				printdatef("Start time", 5);
+				printdatef("End time", 9);
+				printf("\t\tBytes\t\t%lu\n", info.bytes);
+				printf("\t\tName\t\t%s\n", info.name);
+				printf("\t\tStart sector\t%lu\n", info.sector_start);
+				printf("\t\tEnd sector\t%lu\n", info.sector_stop);
+			}
+			else
+				printf("Error: Can not load info for log %i\n", logIdx);
+			return 0;
+		}
+		else
+			return usageMsg("rexgen SD log count|0..COUNT-1");
+
+		return 0;
+	}
+
+	if (strcmp(arg1, "file") == 0)	// just print the full file name by log idx 
+	{
+		if (arg2 == NULL)
+			return 1;
+
+		if (strspn(arg2, "0123456789") == strlen(arg2))
+		{
+			short logIdx = atoi(arg2);
+			log_info info;
+			if (LogInfoRXD(&DeviceObj, logIdx, &info) == 0)
+				printf("%s\n", info.name_full);
+
+			return 0;
+		}
+	}
+
+	if (strcmp(arg1, "rxd") == 0) 
+	{
+		if (arg2 == NULL)
+			return usageMsg("rexgen SD rxd all|0..COUNT-1");
+
+		if (strspn(arg2, "0123456789") == strlen(arg2))
+		{
+			if (arg2 == NULL)
+				return usageMsg("rexgen SD rxd LOG_IDX");
+
+			unsigned short logIdx = atoi(arg2);
+	    		DownloadRXD(&DeviceObj, logIdx, 1);
+
+			return 0;		
+		}
+
+	    	if (strcmp(arg2, "all") == 0)
+		{
+			ReadConfigFile(&conf);
+
+			CheckFolder(conf.rxd_folder);
+
+			char *cmd[50];
+			sprintf(cmd, "rm -f  %s*.rxd", conf.rxd_folder);
+			exec(cmd);
+
+			unsigned short beg, end;
+			unsigned char res = PrepareDownloadAllRXD(&DeviceObj, &conf);
+
+			WriteConfigFile(&conf);
+
+			ProgressInit(conf.rxd_idx_end - conf.rxd_idx_beg, "Loading RXD files ...");
+
+			for (unsigned short i = conf.rxd_idx_beg; i <= conf.rxd_idx_end; i++)
+			{
+				ProgressPos(PrgMax - (conf.rxd_idx_end - i));
+				DownloadRXD(&DeviceObj, i, 0);
+			}
+			printf("\n");
+			SDCommandFlag = false;
+			return 0;
+		}
+
+		return usageMsg("rexgen SD rxd all|0..COUNT-1");
+	}
+
+	if (strcmp(arg1, "format") == 0) 
+	{
+		char in;    
+		printf(BOLD_YELLOW"This action will format the SD card. Do you want to continue? [y/n]"COLOR_RESET);
+		scanf(" %c", &in);
+
+		if ((in == 121) || (in == 89))
+		{
+			DeviceObj.ep[0].timeout = 5000;
+			if (SendCommand(&DeviceObj, 0, &cmmdSDFormat) == 0)
+				printf("Format complete.\n");
+		}
+		SDCommandFlag = false;
+		return 0;
+	}
+
+	if (strcmp(arg1, "info") == 0) 
+	{
+		DeviceObj.ep[0].timeout = 5000;
+		SendCommand(&DeviceObj, 0, &cmmdSDInfo);
+
+		MMCInfoStruct mmc_info;
+		printf("SD info \n");
+
+		printf("\t\tType\t\t");
+			for (int i = 5; i < sizeof(mmc_info.Type) + 5; i++)
+				printf("%c", DeviceObj.ep[0].rx_data[i]);
+		printf("\n");
+		printf("\t\tVersion\t\t%i\n", DeviceObj.ep[0].rx_data[11]);
+		printf("\t\tBlock size\t%hu\n", ushortFromRXData(&DeviceObj, 12));
+		printf("\t\tFull size\t%lu\n", ulongFromRXData(&DeviceObj, 14));
+		printf("\t\tFree space\t%lu\n", ulongFromRXData(&DeviceObj, 18));
+
+		return 0;
+	}
+
+	return usageMsg("rexgen SD log|rxd|format|info");
 }
 
 char GetSerialNumPageIdx(char *arg[])
@@ -97,10 +243,11 @@ void checkArg(char *arg[])
 	printf("USAGE: \n");
 	printf("	rexgen [COMMAND [PARAMETERS] [COMMAND [PARAMETERS]] ...]\n\n");
 	printf("COMMAND: \n");
-	printf("	shutdown	 	Shut down the device\n");
+//	printf("	shutdown	 	Shut down the device\n");
 	printf("	version			Show versions of config and stream tools\n");
 	printf("	firmware		Show device firmware version\n");
 	printf("	serial	[short]		Show device serial number in selected format\n");
+	printf("	SD log|rxd|format|info	Support SD card functions  \n");
 	printf("	hwinfo                  Show hardware configuration and info for connected devices\n");
 	printf("	date	set|get		Set/get system date and time to/from device\n");
 	printf("	config			Show configuration name and UUID\n");
@@ -141,6 +288,8 @@ void checkArg(char *arg[])
 	flag = true;
     else if (strcmp(arg, "cpu") == 0)
 	flag = true;
+    else if (strcmp(arg, "SD") == 0)
+	flag = true;
 
 
     if (!flag)
@@ -150,30 +299,10 @@ void checkArg(char *arg[])
     }
 }
 
-int exec(char *command) {
-    char buffer[128];
-    char result[2] = "-1";
-
-    // Open pipe to file
-    FILE* pipe = popen(command, "r");
-    if (!pipe)
-	return -1;
-   
-
-    // read till end of process:
-    while (!feof(pipe)) 
-	// use buffer to read and add to result
-	if (fgets(buffer, 128, pipe) != NULL)
-	    strcpy(result, buffer);
-    
-   pclose(pipe);
-   return atoi(result);
-}
-
 int main(int argc, char *argv[]) 
 {
 	int VERSION_MAJOR = 1;
-	int VERSION_MINOR = 16;
+	int VERSION_MINOR = 17;
 
 	void print_versions ()
 	{
@@ -202,14 +331,17 @@ int main(int argc, char *argv[])
 		GetProcessorTypeFromFile(argv[2]);
 		return 0;
 	}
-
-	if (exec("systemctl list-unit-files rexgen_data.service | wc -l") > 3)
-            system("systemctl stop rexgen_data.service");
+	
+	if (exec("systemctl is-active application.service") == 0)
+//	if (exec("systemctl list-unit-files rexgen_data.service | wc -l") > 3)
+        	system("systemctl stop rexgen_data.service");
 
         RebootAfterReflash = 1;
 	bool ReflashFlag = false;
 	HideRequest = true;
 	char *str;
+	SDCommandFlag = false;
+
 	if (InitDevice(&DeviceObj, 0x16d0, 0x0f14))//, 2)) 
 	{	
 		for (int i = 1; i < argc; ++i)
@@ -248,7 +380,7 @@ int main(int argc, char *argv[])
                         }
 			else if (strcmp(argv[i], "serial") == 0)
 			{
-				GetSerialNumber(&DeviceObj, GetSerialNumPageIdx(argv[i + 1]));
+				unsigned long ser = GetSerialNumber(&DeviceObj, GetSerialNumPageIdx(argv[i + 1]), 0);
 			}
 			else if (strcmp(argv[i], "config") == 0)
 			{
@@ -301,86 +433,22 @@ int main(int argc, char *argv[])
 				}
 			}
 
+			else if (strcmp(argv[i], "SD") == 0)
+			{
+				if (checkSDArg(argv[i + 1], argv[i + 2]) != 0)
+					break;
+				
+			}
+
 			else if (strcmp(argv[i], "shutdown") == 0)
 			{
 				SendCommand(&DeviceObj, 0, &cmmdForceGoDeepSleep);
 			}
 			else if (strcmp(argv[i], "test") == 0)
 			{
-GetProcessorTypeFromFile(argv[i+1]);
+//				GetProcessorTypeFromFile(argv[i+1]);
 			}
 
-// ****** obsolete *******
-			else if (strcmp(argv[i], "initcan") == 0)
-			{
-				initStruct cmmdInit = {
-					bus: atoi(argv[i+1]),
-					fdf: 0,
-					brs: 0,
-					silent: atoi(argv[i + 3]),
-					speed: atoi(argv[i+2]),
-					speed_fd: 0,
-					rx_id: (int)strtol(argv[i+4], NULL, 0),
-				};
-
-				SendInitBus(&DeviceObj, &cmmdInit);
-			}
-			else if (strcmp(argv[i], "deinitbus") == 0)
-			{
-				SendCommand(&DeviceObj, 0, &cmmdDeinitBus);
-			}
-			else if (strcmp(argv[i], "initcanfd") == 0)
-			{
-				initStruct cmmdInit = {
-					bus: atoi(argv[i+1]),
-					fdf: atoi(argv[i+6]),
-					brs: atoi(argv[i+7]),
-					silent: atoi(argv[i + 3]),
-					speed: atoi(argv[i+2]),
-					speed_fd: atoi(argv[i+5]),
-					rx_id: (int)strtol(argv[i+4], NULL, 0),
-				};
-
-				SendInitBus(&DeviceObj, &cmmdInit);
-			}
-			else if (strcmp(argv[i], "cansend") == 0 || strcmp(argv[i], "cansendext") == 0)
-			{
-				cmdCANstruct cmdCan;
-				cmdCan.Extended = 0;
-				if (strcmp(argv[i], "cansendext") == 0){
-					cmdCan.Extended = 1;
-					printf("ext");
-				}
-				
-				cmdCan.Bus = atoi(argv[i+1]);
-				cmdCan.DLC = atoi(argv[i+2]);
-				cmdCan.ID = (int)strtol(argv[i+3], NULL, 0);
-				cmdCan.TimeStamp = 2000;
-				
-		        	for (int j = 0; j < 64; ++j)
-					cmdCan.Data[j] = 0;
-            	
-				for (int j = 0; j < cmdCan.DLC; ++j)
-				{
-					char x;
-					if (i+j+4 < argc)
-					{
-    					sscanf(argv[i+j+4], "%x", &x);
-    					cmdCan.Data[j] = x;
-					}
-					else
-						cmdCan.Data[j] = 0;					
-				}
-				SendCANCmd(&DeviceObj, &cmdCan);			
-			}
-			else if (strcmp(argv[i], "canread") == 0)
-			{
-				unsigned long msgCount = 0;
-				if (argc > i+2)
-					msgCount = atoi(argv[i+2]);
-				ReadCANMsg(&DeviceObj, atoi(argv[i+1]), msgCount);				
-			}
-// ***************
 			else if (strcmp(argv[i], "configure") == 0)
 			{
 				if (argc < 3)
@@ -400,7 +468,8 @@ GetProcessorTypeFromFile(argv[i+1]);
 	ReleaseDevice(&DeviceObj);
 	ReleaseUsbLibrary();
 
-	if (exec("systemctl list-unit-files rexgen_data.service | wc -l") > 3)
+//	if (exec("systemctl list-unit-files rexgen_data.service | wc -l") > 3)
+	if (! SDCommandFlag)
 		system("systemctl start rexgen_data.service");
 	return 0;
 }

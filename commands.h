@@ -51,53 +51,72 @@ typedef struct
 } initStruct;
 
 typedef struct
-{	
-   unsigned char Bus;   
-   unsigned char Extended;
-   unsigned char DLC;
-   uint32_t ID;
-   uint32_t TimeStamp;
-   unsigned char Data[64];
+{
+	unsigned char Bus;
+	unsigned char Extended;
+	unsigned char DLC;
+	uint32_t ID;
+	uint32_t TimeStamp;
+	unsigned char Data[64];
 } cmdCANstruct;
 
 typedef struct
-{	
-	unsigned char Bus;   
-   uint32_t Timeout;
+{
+	unsigned char Bus; 
+	uint32_t Timeout;
 } cmdRequestRX;
 
 typedef struct
 {
-   unsigned char  Bus;  
-   unsigned char  Flags;
-   unsigned char  DLC;  
-   uint32_t  ID;
-   uint32_t  TimeStamp;
-   uint32_t  Timeout;
-   unsigned char  Data[64];
+	unsigned char  Bus;  
+	unsigned char  Flags;
+	unsigned char  DLC;  
+	uint32_t  ID;
+	uint32_t  TimeStamp;
+	uint32_t  Timeout;
+    unsigned char  Data[64];
 } CAN_TX_RX_STRUCT;
 
 typedef struct
 {	   
-   unsigned char  Bus;  
-   unsigned char  Flags;
-   unsigned char  DLC;  
-   uint32_t  ID;
-   uint32_t  TimeStamp;
-   unsigned char  Data[64];
+	unsigned char  Bus;  
+	unsigned char  Flags;
+	unsigned char  DLC;  
+	uint32_t  ID;
+	uint32_t  TimeStamp;
+	unsigned char  Data[64];
 } ResponseStruct;
-
 
 typedef struct
 {
-    unsigned short  UID; 
-    unsigned char InfSize;
-    unsigned char DLC;
-    uint32_t TimeStamp;
-    uint32_t CANID;
-    unsigned char CANFlag;
-    unsigned char Data[8];
+	unsigned short  UID;
+	unsigned char InfSize;
+	unsigned char DLC;
+	uint32_t TimeStamp;
+	uint32_t CANID;
+	unsigned char CANFlag;
+	unsigned char Data[8];
 } structGNSSData;
+
+typedef struct
+{
+  unsigned char  Type[6];
+  unsigned char  Version;		
+  unsigned short BlockSize;
+  unsigned long  FullSize;
+  unsigned long  FreeSpace;
+} MMCInfoStruct;
+
+typedef struct
+{
+    unsigned long time_start;
+    unsigned long time_stop;
+    unsigned long bytes;
+    char *name[50];
+    char *name_full[255];	
+    unsigned long sector_start;
+    unsigned long sector_stop;
+}log_info;
 
 #pragma pack(pop)
 
@@ -106,9 +125,9 @@ static const cmmdStruct cmmdGetHWSettings = {2, 134,  {0x22, 0x00}};
 static const cmmdStruct cmmdGetSerialNumber = {2, 134,  {0x15, 0x00}}; 
 static const cmmdStruct cmmdGetMicroType = {2, 7,  {0x2E, 0x00}}; 
 static const cmmdStruct cmmdGetStructName = {2, 200,  {0x1C, 0x00}}; 
-static const cmmdStruct cmmdUSBStartLiveData = {3, 7,  {0x19, 0x00, 0x00}}; //Third Param is Channel 
-static const cmmdStruct cmmdUSBStopLiveData = {3, 7,  {0x1A, 0x00, 0}};  //Third Param is Channel
-static const cmmdStruct cmmdUSBGetLiveData = {3, 16,  {0x83, 0x00, 0}};  //Third Param is Channel
+static const cmmdStruct cmmdUSBStartLiveData = {3, 7,  {0x19, 0x00, 0x00}}; 	//Third Param is Channel 
+static const cmmdStruct cmmdUSBStopLiveData = {3, 7,  {0x1A, 0x00, 0}};  	//Third Param is Channel
+static const cmmdStruct cmmdUSBGetLiveData = {3, 16,  {0x83, 0x00, 0}};  	//Third Param is Channel
 static const cmmdStruct cmmdDeinitBus = {2, 6,  {0x20, 0x00}}; 
 static const cmmdStruct cmmdGetConfigSize = {2, 26,  {0x0A, 0x00}}; 
 static const cmmdStruct cmmd41 = {4, 10,  {0x41, 0x00}};
@@ -116,10 +135,16 @@ static const cmmdStruct cmmd42 = {4, 10,  {0x42, 0x00}};
 static const cmmdStruct cmmd43 = {4, 16,  {0x43, 0x00}};
 static const cmmdStruct cmmdGetNFC = {2, 18,  {0x44, 0x00}}; 
 static const cmmdStruct cmmdForceGoDeepSleep = {2, 6,  {0x45, 0x00}}; 
-static const cmmdStruct cmmdGetEEPROMPage2 = {3, 70,  {0x23, 0x00, 0x02}}; //	SN page 
-static const cmmdStruct cmmdGetEEPROMPage3 = {3, 70,  {0x23, 0x00, 0x03}}; //	HW config page
+static const cmmdStruct cmmdGetEEPROMPage2 = {3, 70,  {0x23, 0x00, 0x02}}; 	//	SN page 
+static const cmmdStruct cmmdGetEEPROMPage3 = {3, 70,  {0x23, 0x00, 0x03}}; 	//	HW config page
 static cmmdStruct cmmdDateSet = {6, 6,  {0x12, 0x00}};
-static const cmmdStruct cmmdDateGet = {2, 10,  {0x11, 0x00}}; 
+static const cmmdStruct cmmdDateGet = {2, 10,  {0x11, 0x00}};
+static const cmmdStruct cmmdSDGetLogCount = {2, 8, {0x0F, 0x00}}; 
+static cmmdStruct cmmdSDGetLogInfo = {4, 306, {0x10, 0x00, 0, 0}}; 		// Third/fourth papam is LogNumber 
+// 3..6 papam is start sector, 7..10 is end sector 
+static cmmdStruct cmmdSDRequestSendData = {12, 6, {0x13, 0x00, 0, 0, 0, 0, 0, 0, 0, 0}};
+static const cmmdStruct cmmdSDFormat = {4, 8,  {0x0E, 0x00, 1, 0}};		// Third/fourth is FormatType = 1
+static const cmmdStruct cmmdSDInfo = {2, 23, {0x1B, 0x00}}; 
 
 unsigned short can0uid;
 unsigned short can1uid;
@@ -156,7 +181,7 @@ char UUIDArr[16];
 unsigned char SendCommand(DeviceStruct *devobj, unsigned char endpoint_id, const cmmdStruct *cmmd);
 void SendStartLiveData(DeviceStruct *devobj, unsigned char channel);
 void SendInitBus(DeviceStruct *devobj, initStruct *cmmdInit);
-void SendCANCmd(DeviceStruct *devobj, cmdCANstruct *cmdCAN);		
+void SendCANCmd(DeviceStruct *devobj, cmdCANstruct *cmdCAN);
 void ReadLiveData(DeviceStruct *devobj, unsigned char channel);
 void ReadCANMsg(DeviceStruct *devobj, unsigned char bus, unsigned long msgCount);
 unsigned char GetConfig(DeviceStruct *devobj);
@@ -165,9 +190,15 @@ void Reflash(DeviceStruct* devobj, char* filename);
 void ApplyReflash(DeviceStruct* devobj);
 char* GetHostName(char res[]);
 unsigned char SendConfig(DeviceStruct* devobj, char* filename);
-void SendGNSSData(DeviceStruct *devobj, structGNSSData *GNSSData);	
-void ReadUsbData(DeviceStruct *devobj, structGNSSData *GNSSData);	
+void SendGNSSData(DeviceStruct *devobj, structGNSSData *GNSSData);
+void ReadUsbData(DeviceStruct *devobj, structGNSSData *GNSSData);
 char *GetProcessorType(char value, char *res);
 char *GetFirmware(char b1, char b2, char b3, char b4, char b5, char *res);
+char *StructDateToStr(DeviceStruct* devobj, int idx, char *fmt, char *res);
+unsigned char DownloadRXD(DeviceStruct* devobj, unsigned short logNum, char checkCount);
+unsigned char DownloadAllRXD(DeviceStruct* devobj, unsigned short beg, unsigned short end); 
+unsigned long ulongFromRXData(DeviceStruct* devobj, unsigned short idx);
+unsigned short ushortFromRXData(DeviceStruct* devobj, unsigned short idx);
+unsigned char LogInfoRXD(DeviceStruct* devobj, unsigned short logIdx, log_info *info);
 
 #endif
