@@ -5,7 +5,7 @@
 #define CONFIG_NAME_LEN 	20
 #define CONFIG_VAL_LEN 		50
 #define CONFIG_FILE		"/home/root/rexusb/etc/rexgen.conf"
-#define CONFIG_RXD_FOLDER	"/home/root/rexusb/rxd/"
+#define CONFIG_RXD_FOLDER	"/data/rexgen/rxd/"
 
 #define BOLD_RED		"\e[1;31m"
 #define BOLD_GREEN		"\e[1;32m"
