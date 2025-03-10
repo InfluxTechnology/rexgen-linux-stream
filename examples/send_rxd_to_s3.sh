@@ -19,11 +19,6 @@ export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY"
 export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_KEY"
 
 while true; do
-	AWS_ACCESS_KEY=$("$PWD"/examples/read_aws_conf.sh ACCESS_KEY)
-	AWS_SECRET_KEY=$("$PWD"/examples/read_aws_conf.sh SECRET_KEY)
-	BUCKET=$("$PWD"/examples/read_aws_conf.sh BUCKET)
-	REGION=$("$PWD"/examples/read_aws_conf.sh REGION)
-
     # Get the first file in the folder (sorted by name)
     FILE=$(ls -1 "$WATCH_DIR"/*.rxd 2>/dev/null | head -n 1)
 
